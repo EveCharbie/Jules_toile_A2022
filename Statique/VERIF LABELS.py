@@ -1,21 +1,5 @@
 """
-Optimisation des k en single shooting, et des masses du centre pour voir leur répartition
-
-Calculer position simulation à un certain instant. Pour  prendre la position d'énergie minimale ? cf statique_oblique_nxm
-Pour ça, besoin des fonctions :
-V Param_fixe, Param_variable (dans le programme de minimisation de l'énergie, c,est la fonction Param)
-V Points_ancrage_repos avec la bonne orientation du repère (même nom de fonction)
-V Spring_bouts, Spring_bouts_croix (même nom de fonction)
-- faire une nouvelle fonction casadi de calcul de l'énergie (Energie_func)
-/!\ je fais le choix de supprimer la contrainte sur Froce_equilibre_func
-- Force_calc qui comprend la fonction d'optimisation
-
-Ensuite cette fonction va ressortir les Pt qu'il nous faudra optimiser.
-
-Choisir un frame dans un essai c3d. prendre un frame sur un essai statique ?
-Sur ce frame choisir les points qui ne sont pas nan et prendre ceux la uniquement pour la simu
-optimiser ces X*3 valeurs et les 12k. (on ne peut pas otpimiser les C car pas de vitesse)
-
+Pour verifier si il y a d'eventuelles erreurs de label
 """
 
 import casadi as cas

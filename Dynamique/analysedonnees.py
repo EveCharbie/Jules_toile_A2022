@@ -1,31 +1,9 @@
-"""
-modélisation de la toile de trampoline en dynamique, ici les k sont fixes et on calcule seulement les C
-On se place sur un intervalle de frame et on utilise un schema d'integration d'euler pour passer d'un instant a un autre
-
-Variables d'optimisation :
-    - C
-    - X
-    - Xdot
-    - Force athlete «-» toile
-On minimise la position des points de collectes par rapport au points simulés ainsi que les forces des plateformes
-et la forces des points simules pour evaluer les C
-
-On contraints la continuité de position et de vitesse entre les frames
-
-
-"""
-
-import casadi as cas
-from IPython import embed
 import numpy as np
 import matplotlib.pyplot as plt
-from ezc3d import c3d
-import time
-import matplotlib.animation as animation
-import mpl_toolkits.mplot3d.axes3d as p3
-import seaborn as sns
-from scipy import signal
 import pickle
+from ezc3d import c3d
+from scipy import signal
+import casadi as cas
 
 n = 15  # nombre de mailles sur le grand cote
 m = 9  # nombre de mailles sur le petit cote
@@ -364,23 +342,11 @@ def Points_ancrage_repos(dict_fixed_params):
 
     Pos_repos_new, Pt_ancrage = rotation_points(Pos_repos_new,Pt_ancrage)
 
-    Pt_ancrage_cas = cas.DM(Pt_ancrage)
-    Pos_repos_cas = cas.DM(Pos_repos)
-
-    # fig = plt.figure(0)
-    # ax = fig.add_subplot(111, projection='3d')
-    # ax.set_box_aspect([1.1, 1.8, 1])
-    # ax.plot(0, 0, -1.2, 'ow')
-    #
-    # ax.plot(Pt_ancrage[:,0], Pt_ancrage[:,1], Pt_ancrage[:,2], 'ok')
-    # ax.plot(Pos_repos_new[:, 0], Pos_repos_new[:, 1], Pos_repos_new[:, 2], 'ob')
-    # plt.show()
-
-    return Pt_ancrage_cas, Pos_repos_cas
+    return Pt_ancrage, Pos_repos_new
 
 def Spring_bouts_repos(Pos_repos, Pt_ancrage):
     # Definition des ressorts (position, taille)
-    Spring_bout_1 = cas.MX.zeros((Nb_ressorts, 3))
+    Spring_bout_1 = np.zeros((Nb_ressorts, 3))
 
     # RESSORTS ENTRE LE CADRE ET LA TOILE
     for i in range(0, Nb_ressorts_cadre):
@@ -397,7 +363,7 @@ def Spring_bouts_repos(Pos_repos, Pt_ancrage):
             Spring_bout_1[Nb_ressorts_cadre + Nb_ressorts_horz + k, :] = Pos_repos[i + n * j, :]
             k += 1
     ####################################################################################################################
-    Spring_bout_2 = cas.MX.zeros((Nb_ressorts, 3))
+    Spring_bout_2 = np.zeros((Nb_ressorts, 3))
 
     # RESSORTS ENTRE LE CADRE ET LA TOILE
     for i in range(0, n):  # points droite du bord de la toile
@@ -435,7 +401,7 @@ def Spring_bouts_repos(Pos_repos, Pt_ancrage):
 
 def Spring_bouts_croix_repos(Pos_repos):
     # RESSORTS OBLIQUES : il n'y en a pas entre le cadre et la toile
-    Spring_bout_croix_1 = cas.MX.zeros((Nb_ressorts_croix, 3))
+    Spring_bout_croix_1 = np.zeros((Nb_ressorts_croix, 3))
 
     # Pour spring_bout_1 on prend uniquement les points de droite des ressorts obliques
     k = 0
@@ -447,7 +413,7 @@ def Spring_bouts_croix_repos(Pos_repos):
             Spring_bout_croix_1[k, :] = Pos_repos[i, :]
             k += 1
 
-    Spring_bout_croix_2 = cas.MX.zeros((Nb_ressorts_croix, 3))
+    Spring_bout_croix_2 = np.zeros((Nb_ressorts_croix, 3))
     # Pour spring_bout_2 on prend uniquement les points de gauche des ressorts obliques
     # pour chaue carre on commence par le point en haut a gauche, puis en bas a gauche
     # cetait un peu complique mais ca marche, faut pas le changer
@@ -472,48 +438,48 @@ def Spring_bouts_croix_repos(Pos_repos):
 def Param_variable(C_symetrie):
     #COEFFICIENTS D'AMORTISSEMENT : la toile est séparéee en 4 quarts dont les C sont les mêmes par symétrie avec le centre
     # C_symetrie = 0.3*np.ones(5*8)
-    C=cas.MX.zeros(n*m)
+    C=np.zeros(n*m)
 
     # coin en bas a droite de la toile : c'est le coin qui définit tous les autres
-    C[0:8] = C_symetrie[0:8]
-    C[15:23] = C_symetrie[8:16]
-    C[30:38] = C_symetrie[16:24]
-    C[45:53] = C_symetrie[24:32]
-    C[60:68] = C_symetrie[32:40]
+    C[0:8] = C_symetrie[0:8].T
+    C[15:23] = C_symetrie[8:16].T
+    C[30:38] = C_symetrie[16:24].T
+    C[45:53] = C_symetrie[24:32].T
+    C[60:68] = C_symetrie[32:40].T
 
     # coin en bas a gauche de la toile :
-    C[75:83] = C_symetrie[24:32]
-    C[90:98] = C_symetrie[16:24]
-    C[105:113] = C_symetrie[8:16]
-    C[120:128] = C_symetrie[0:8]
+    C[75:83] = C_symetrie[24:32].T
+    C[90:98] = C_symetrie[16:24].T
+    C[105:113] = C_symetrie[8:16].T
+    C[120:128] = C_symetrie[0:8].T
 
     #coin en haut a droite de la toile :
-    C[14:7:-1] = C_symetrie[0:7]
-    C[29:22:-1] = C_symetrie[8:15]
-    C[44:37:-1] = C_symetrie[16:23]
-    C[59:52:-1] = C_symetrie[24:31]
-    C[74:67:-1] = C_symetrie[32:39]
+    C[14:7:-1] = C_symetrie[0:7].T
+    C[29:22:-1] = C_symetrie[8:15].T
+    C[44:37:-1] = C_symetrie[16:23].T
+    C[59:52:-1] = C_symetrie[24:31].T
+    C[74:67:-1] = C_symetrie[32:39].T
 
     # coin en haut a gauche de la toile :
-    C[89:82:-1] = C_symetrie[24:31]
-    C[104:97:-1] = C_symetrie[16:23]
-    C[119:112:-1] = C_symetrie[8:15]
-    C[134:127:-1] = C_symetrie[0:7]
+    C[89:82:-1] = C_symetrie[24:31].T
+    C[104:97:-1] = C_symetrie[16:23].T
+    C[119:112:-1] = C_symetrie[8:15].T
+    C[134:127:-1] = C_symetrie[0:7].T
 
     return C  #  sx
 
 def Param_variable_force(F):
-    F_tab = cas.MX.zeros(5,3)
-    F_tab[0, :] = F[:3]
-    F_tab[1, :] = F[3:6]
-    F_tab[2, :] = F[6:9]
-    F_tab[3, :] = F[9:12]
-    F_tab[4, :] = F[12:15]
+    F_tab = np.zeros((5,3))
+    F_tab[0, :] = F[:3].T
+    F_tab[1, :] = F[3:6].T
+    F_tab[1, :] = F[6:9].T
+    F_tab[1, :] = F[9:12].T
+    F_tab[1, :] = F[12:15].T
     return F_tab
 
 def Spring_bouts(Pt, Pt_ancrage): #sx
     # Definition des ressorts (position, taille)
-    Spring_bout_1 = cas.MX.zeros((Nb_ressorts, 3))
+    Spring_bout_1 = np.zeros((Nb_ressorts, 3))
 
     # RESSORTS ENTRE LE CADRE ET LA TOILE
     for i in range(0, Nb_ressorts_cadre):
@@ -530,7 +496,7 @@ def Spring_bouts(Pt, Pt_ancrage): #sx
             Spring_bout_1[Nb_ressorts_cadre + Nb_ressorts_horz + k, :] = Pt[i + n * j, :]
             k += 1
     ####################################################################################################################
-    Spring_bout_2 = cas.MX.zeros((Nb_ressorts, 3))
+    Spring_bout_2 = np.zeros((Nb_ressorts, 3))
 
     # RESSORTS ENTRE LE CADRE ET LA TOILE
     for i in range(0, n):  # points droite du bord de la toile
@@ -568,7 +534,7 @@ def Spring_bouts(Pt, Pt_ancrage): #sx
 
 def Spring_bouts_croix(Pt): #sx
     # RESSORTS OBLIQUES : il n'y en a pas entre le cadre et la toile
-    Spring_bout_croix_1 = cas.MX.zeros((Nb_ressorts_croix, 3))
+    Spring_bout_croix_1 = np.zeros((Nb_ressorts_croix, 3))
 
     # Pour spring_bout_1 on prend uniquement les points de droite des ressorts obliques
     k = 0
@@ -580,7 +546,7 @@ def Spring_bouts_croix(Pt): #sx
             Spring_bout_croix_1[k, :] = Pt[i, :]
             k += 1
 
-    Spring_bout_croix_2 = cas.MX.zeros((Nb_ressorts_croix, 3))
+    Spring_bout_croix_2 = np.zeros((Nb_ressorts_croix, 3))
     # Pour spring_bout_2 on prend uniquement les points de gauche des ressorts obliques
     # pour chaue carre on commence par le point en haut a gauche, puis en bas a gauche
     # cetait un peu complique mais ca marche, faut pas le changer
@@ -610,28 +576,29 @@ def Force_calc(Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_cr
     k = dict_fixed_params['k']
     k_oblique = dict_fixed_params['k_ob']
 
-    F_spring = cas.MX.zeros((Nb_ressorts, 3))
-    Vect_unit_dir_F = cas.MX.zeros((Nb_ressorts, 3))
+    F_spring = np.zeros((Nb_ressorts, 3))
+    Vect_unit_dir_F = np.zeros((Nb_ressorts, 3))
     for i in range(Nb_ressorts):
-        Vect_unit_dir_F[i, :] = (Spring_bout_2[i, :] - Spring_bout_1[i, :]) / cas.norm_fro(
+        Vect_unit_dir_F[i, :] = (Spring_bout_2[i, :] - Spring_bout_1[i, :]) / np.linalg.norm(
             Spring_bout_2[i, :] - Spring_bout_1[i, :])
-    # Vect_unit_dir_F = (Spring_bout_2 - Spring_bout_1) / cas.norm_fro(Spring_bout_2 - Spring_bout_1)
+
     for ispring in range(Nb_ressorts):
         F_spring[ispring, :] = Vect_unit_dir_F[ispring, :] * k[ispring] * (
-                cas.norm_fro(Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]) - l_repos[ispring])
+                np.linalg.norm(Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]) - l_repos[ispring])
 
     # F_spring_croix = np.zeros((Nb_ressorts_croix, 3))
-    F_spring_croix = cas.MX.zeros((Nb_ressorts_croix, 3))
-    Vect_unit_dir_F_croix = cas.MX.zeros((Nb_ressorts, 3))
+    F_spring_croix = np.zeros((Nb_ressorts_croix, 3))
+    Vect_unit_dir_F_croix = np.zeros((Nb_ressorts, 3))
     for i in range(Nb_ressorts_croix):
-        Vect_unit_dir_F_croix[i, :] = (Spring_bout_croix_2[i, :] - Spring_bout_croix_1[i, :]) / cas.norm_fro(
+        Vect_unit_dir_F_croix[i, :] = (Spring_bout_croix_2[i, :] - Spring_bout_croix_1[i, :]) / np.linalg.norm(
             Spring_bout_croix_2[i, :] - Spring_bout_croix_1[i, :])
+
     for ispring in range(Nb_ressorts_croix):
         F_spring_croix[ispring, :] = Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * (
-                cas.norm_fro(Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) - l_repos_croix[
+                np.linalg.norm(Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) - l_repos_croix[
             ispring])
 
-    F_masses = cas.MX.zeros((n * m, 3))
+    F_masses = np.zeros((n * m, 3))
     F_masses[:, 2] = - M * 9.81
 
     return F_spring, F_spring_croix, F_masses
@@ -639,16 +606,16 @@ def Force_calc(Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_cr
 def Force_amortissement(Xdot, C):
 
     C = Param_variable(C)
-    F_amortissement = cas.MX.zeros((n*m, 3))
+    F_amortissement = np.zeros((n*m, 3))
     for point in range (n*m):
-            F_amortissement[point, 2] = - C[point] * Xdot[point, 2]**2   # turbulent = amortissement quadratique
+            F_amortissement[point, 2] = - C[point] * Xdot[point, 2]**2   # turbulent = amortissement quadratique ????
 
     return F_amortissement
 
 def Force_point(F_spring, F_spring_croix, F_masses, F_amortissement):  # --> resultante des forces en chaque point a un instant donne
 
     # forces elastiques
-    F_spring_points = cas.MX.zeros((n * m, 3))
+    F_spring_points = np.zeros((n * m, 3))
 
     # - points des coin de la toile : VERIFIE CEST OK
     F_spring_points[0, :] = F_spring[0, :] + \
@@ -737,6 +704,28 @@ def Force_point(F_spring, F_spring_croix, F_masses, F_amortissement):  # --> res
 
     return F_point
 
+def Force_totale_par_points(X, Xdot, C, F, Masse_centre, ind_masse):
+
+    Pt = X
+    F = Param_variable_force(F)
+    dict_fixed_params = Param_fixe(Masse_centre)
+    Pt_ancrage = Points_ancrage_fix(dict_fixed_params)
+    Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2 = Bouts_ressorts_repos(Pt_ancrage, Pt)
+
+    F_spring, F_spring_croix, F_masses = Force_calc(Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2, dict_fixed_params)
+    F_amortissement = Force_amortissement(Xdot, C)
+
+    F_point = Force_point(F_spring, F_spring_croix, F_masses,  F_amortissement)
+
+    # ajout des forces de l'athlete
+    F_point[ind_masse, :] = F[0, :]
+    F_point[ind_masse + 1, :] = F[1, :]
+    F_point[ind_masse - 1, :] = F[2, :]
+    F_point[ind_masse + 15, :] = F[3, :]
+    F_point[ind_masse - 15, :] = F[4, :]
+
+    return F_point
+
 def Force_totale_points(X, Xdot, C, F, Masse_centre, ind_masse):
 
     Pt = X
@@ -751,37 +740,19 @@ def Force_totale_points(X, Xdot, C, F, Masse_centre, ind_masse):
     F_point = Force_point(F_spring, F_spring_croix, F_masses,  F_amortissement)
 
     # ajout des forces de l'athlete
-    F_point[ind_masse, :] -= F[0, :]
-    F_point[ind_masse + 1, :] -= F[1, :]
-    F_point[ind_masse - 1, :] -= F[2, :]
-    F_point[ind_masse + 15, :] -= F[3, :]
-    F_point[ind_masse - 15, :] -= F[4, :]
+    F_point[ind_masse, :] = F[0, :]
+    F_point[ind_masse + 1, :] = F[1, :]
+    F_point[ind_masse - 1, :] = F[2, :]
+    F_point[ind_masse + 15, :] = F[3, :]
+    F_point[ind_masse - 15, :] = F[4, :]
 
-    F_tot = cas.MX.zeros((1, 3))
+    F_tot =np.zeros((1, 3))
     for point in range (n*m):
             F_tot[0, 0] += F_point[point, 0]
             F_tot[0, 1] += F_point[point, 1]
             F_tot[0, 2] += F_point[point, 2]
 
     return F_tot
-
-def rotation_points_cas(Pos_repos,Pt_ancrage):
-    mat_base_collecte = np.array([[ 0.99964304, -0.02650231,  0.00338079],
-               [ 0.02650787,  0.99964731, -0.00160831],
-               [-0.00333697,  0.00169736,  0.99999299]])
-    #calcul inverse puis passage en casadi
-    mat_base_inv_np = np.linalg.inv(mat_base_collecte)
-    mat_base_inv = cas.MX(mat_base_inv_np)
-
-    Pt_ancrage_new = cas.DM.zeros((Nb_ressorts_cadre,3))
-    for index in range (Nb_ressorts_cadre) :
-        Pt_ancrage_new[index,:] = cas.mtimes(Pt_ancrage[index,:], mat_base_inv) #multplication de matrices en casadi
-
-    Pos_repos_new = cas.DM.zeros((n*m, 3))
-    for index in range(n*m):
-        Pos_repos_new[index, :] = cas.mtimes(Pos_repos[index, :], mat_base_inv)  # multplication de matrices en casadi
-
-    return Pos_repos_new,Pt_ancrage_new
 
 def rotation_points(Pos_repos,Pt_ancrage):
     mat_base_collecte = np.array([[ 0.99964304, -0.02650231,  0.00338079],
@@ -802,20 +773,20 @@ def rotation_points(Pos_repos,Pt_ancrage):
 
 
 def tab2list (tab) :
-    list = cas.MX.zeros(135 * 3)
+    list = np.zeros(135 * 3)
     for i in range(135):
         for j in range(3):
             list[j + 3 * i] = tab[i, j]
     return list
 
 def list2tab (list) :
-    tab = cas.MX.zeros(135, 3)
+    tab = np.zeros(135, 3)
     for ind in range(135):
         for i in range(3):
             tab[ind, i] = list[i + 3 * ind]
     return tab
 
-def interpolation_collecte_nan(Pt_collecte, labels) :
+def interpolation_collecte(Pt_collecte, labels) :
     """
     Interpoler lespoints manquants de la collecte pour les utiliser dans l'initial guess
     :param Pt_collecte: DM(3,135)
@@ -831,7 +802,7 @@ def interpolation_collecte_nan(Pt_collecte, labels) :
 
     return Pt_interpole
 
-def interpolation_collecte(Pt_collecte, Pt_ancrage, labels) :
+def interpolation_collecte_lineaire(Pt_collecte, Pt_ancrage, labels) :
     """
     Interpoler lespoints manquants de la collecte pour les utiliser dans l'initial guess
     :param Pt_collecte: DM(3,135)
@@ -840,7 +811,7 @@ def interpolation_collecte(Pt_collecte, Pt_ancrage, labels) :
     """
     #liste avec les bons points aux bons endroits, et le reste vaut 0
 
-    Pt_interpole = cas.DM.zeros((3,135))
+    Pt_interpole = np.zeros((3,135))
     for ind in range (135) :
         if 't' + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index('t' + str(ind))])==False :
             Pt_interpole[:,ind] = Pt_collecte[:, labels.index('t' + str(ind))]
@@ -891,8 +862,8 @@ def Vit_initial(Ptavant, Ptapres, labels):
     vitesse initiale a l'instant -1, de la frame 0 de l'intervalle dynamique
     """
 
-    position_imoins1 = interpolation_collecte_nan(Ptavant, labels)
-    position_iplus1 = interpolation_collecte_nan(Ptapres, labels)
+    position_imoins1 = interpolation_collecte(Ptavant, labels)
+    position_iplus1 = interpolation_collecte(Ptapres, labels)
     distance_xyz = np.abs(position_imoins1 - position_iplus1)
     vitesse_initiale = distance_xyz / (2 * 0.002)
 
@@ -925,20 +896,20 @@ def Integration(X, Xdot, F, C, Masse_centre, ind_masse):
     F = Param_variable_force(F) #bonnes dimensions
 
     # initialisation
-    Pt_integ = cas.MX.zeros((n * m, 3))
-    vitesse_calc = cas.MX.zeros((n * m, 3))
-    accel_calc = cas.MX.zeros((n * m, 3))
+    Pt_integ = np.zeros((n * m, 3))
+    vitesse_calc = np.zeros((n * m, 3))
+    accel_calc = np.zeros((n * m, 3))
 
     Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2 = Bouts_ressorts_repos(Pt_ancrage, Pt)
     F_spring, F_spring_croix, F_masses = Force_calc(Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2, dict_fixed_params)
     F_amortissement = Force_amortissement(Vitesse, C)
     F_point = Force_point(F_spring, F_spring_croix, F_masses, F_amortissement)
     # ajout des forces de l'athlete
-    F_point[ind_masse, :] -= F[0, :]
-    F_point[ind_masse + 1, :] -= F[1, :]
-    F_point[ind_masse - 1, :] -= F[2, :]
-    F_point[ind_masse + 15, :] -= F[3, :]
-    F_point[ind_masse - 15, :] -= F[4, :]
+    F_point[ind_masse, :] = F[0, :]
+    F_point[ind_masse + 1, :] = F[1, :]
+    F_point[ind_masse - 1, :] = F[2, :]
+    F_point[ind_masse + 15, :] = F[3, :]
+    F_point[ind_masse - 15, :] = F[4, :]
 
     for i in range(0, n * m):
         # acceleration
@@ -950,12 +921,21 @@ def Integration(X, Xdot, F, C, Masse_centre, ind_masse):
 
     return Pt_integ, vitesse_calc
 
+def obj_force(Force_collecte, force_accel_cadre):
+    masse_trampo = 270
+
+    obj_force = np.zeros((1, 3))
+    obj_force[0, 0] = Force_collecte[0] - force_accel_cadre[0]
+    obj_force[0, 1] = Force_collecte[1] - force_accel_cadre[1]
+    obj_force[0, 2] = Force_collecte[2] + masse_trampo * 9.81 - force_accel_cadre[2]
+
+    return obj_force
 
 def Acceleration_cadre(Pt, total_frame):
-    masse_cadre = 270
+    masse_cadre = 260
     dt = 1 / 500
 
-    axe = 11 # point du cadre qui existe presque toujours
+    axe = 11
     time = np.linspace(0, 10, total_frame)
     time2 = np.linspace(0, 10, total_frame-2)
 
@@ -972,7 +952,6 @@ def Acceleration_cadre(Pt, total_frame):
     yfil = signal.filtfilt(a, b, y, method="gust")
     xfil = signal.filtfilt(a, b, x, method="gust")
 
-
     for pos in range(1, len(zfil) - 1):
         accz.append(((zfil[pos + 1] + zfil[pos - 1] - 2 * zfil[pos]) / (dt**2)))
         accy.append(((yfil[pos + 1] + yfil[pos - 1] - 2 * yfil[pos]) / (dt ** 2)))
@@ -985,35 +964,35 @@ def Acceleration_cadre(Pt, total_frame):
     fig, ax = plt.subplots(2, 3)
     fig.suptitle('Position sur Z du point d\'ancrage')
 
-    ax[0,0].plot(time[:len(Pt)], x, label='Données collectées')
-    ax[0,0].plot(time[:len(Pt)], xfil, '-r', label='Données filtrées')
-    ax[0,0].set_xlabel('Temps (s)')
-    ax[0,0].set_ylabel('X (m)')
+    ax[0, 0].plot(time[:len(Pt)], x, label='Données collectées')
+    ax[0, 0].plot(time[:len(Pt)], xfil, '-r', label='Données filtrées')
+    ax[0, 0].set_xlabel('Temps (s)')
+    ax[0, 0].set_ylabel('X (m)')
     # ax[1,0].plot(time2, accx, '-g')
     ax[1, 0].plot(time2[:len(fx)], fx, color='lime', marker='o')
-    ax[1,0].set_xlabel('Temps (s)')
-    ax[1,0].set_ylabel('Force cadre X (N)')
+    ax[1, 0].set_xlabel('Temps (s)')
+    ax[1, 0].set_ylabel('Force cadre X (N)')
 
-    ax[0,1].plot(time[:len(Pt)], y)
-    ax[0,1].plot(time[:len(Pt)], yfil, '-r')
-    ax[0,1].set_xlabel('Temps (s)')
-    ax[0,1].set_ylabel('Y (m)')
+    ax[0, 1].plot(time[:len(Pt)], y)
+    ax[0, 1].plot(time[:len(Pt)], yfil, '-r')
+    ax[0, 1].set_xlabel('Temps (s)')
+    ax[0, 1].set_ylabel('Y (m)')
     # ax[1,1].plot(time2, accy, '-g')
-    ax[1, 1].plot(time2[:len(fy)], fy, color='lime',marker='o')
-    ax[1,1].set_xlabel('Temps (s)')
-    ax[1,1].set_ylabel('Force cadre Y (N)')
+    ax[1, 1].plot(time2[:len(fy)], fy, color='lime', marker='o')
+    ax[1, 1].set_xlabel('Temps (s)')
+    ax[1, 1].set_ylabel('Force cadre Y (N)')
 
     ax[0, 2].plot(time[:len(Pt)], z)
     ax[0, 2].plot(time[:len(Pt)], zfil, '-r')
     ax[0, 2].set_xlabel('Temps (s)')
     ax[0, 2].set_ylabel('Z (m)')
     # ax[1,2].plot(time2, accz, '-g', label = 'Accélération')
-    ax[1, 2].plot(time2[:len(fz)], fz, color='lime',marker='o', label='Force de l\'accélération du cadre')
-    ax[1,2].set_xlabel('Temps (s)')
-    ax[1,2].set_ylabel('Force cadre Z (N)')
+    ax[1, 2].plot(time2[:len(fz)], fz, color='lime', marker='o', label='Force de l\'accélération du cadre')
+    ax[1, 2].set_xlabel('Temps (s)')
+    ax[1, 2].set_ylabel('Force cadre Z (N)')
 
     fig.legend(shadow=True)
-    plt.show()
+    # plt.show()
 
     return np.array(( fx, fy, fz))
 
@@ -1057,7 +1036,6 @@ def Interpolation_ancrage(liste_point_ancrage, label_ancrage):
             Pt_anc_interp[ind, :] = liste_point_ancrage[label_ancrage.index('C' + str(ind)) , :]
 
     return Pt_anc_interp
-
 
 def Resultat_PF_collecte(participant,statique_name, vide_name, trial_name, intervalle_dyna) :
     def open_c3d(participant, trial_name):
@@ -1334,305 +1312,109 @@ def Resultat_PF_collecte(participant,statique_name, vide_name, trial_name, inter
 
     return F_collecte_cas,Pt_collecte_tab,labels,ind_marqueur_min
 
-#####################################################################################################################
-
-def Optimisation() :  # main
-
-    def kC_bounds (Uk_C) : #initial guess pour les C
-        """
-        :param Uk_C: symolique des C, pour la shape
-        :return: bounds et init de C
-        """
-
-        C = [10]*Uk_C.shape[0]
-        w0_C = C
-        lbw_C = [1e-3]*Uk_C.shape[0]
-        ubw_C = [1e+3]*Uk_C.shape[0]
-
-        return  lbw_C, ubw_C, w0_C
-
-    def Pt_bounds(x ,Pt_collecte, Pt_ancrage, labels) : #bounds and initial guess
-        """
-        :param x:
-        :param Pos:
-        :return: bound et init pour les positions
-        """
-        lbw_Pt = []
-        ubw_Pt = []
-        w0_Pt = []
-
-        Pt_inter = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
-
-        for k in range(405):
-            if k % 3 == 0:  # limites et guess en x
-                lbw_Pt += [Pt_inter[0, int(k // 3)] - 0.3]
-                ubw_Pt += [Pt_inter[0, int(k // 3)] + 0.3]
-                w0_Pt += [Pt_inter[0, int(k // 3)]]
-            if k % 3 == 1:  # limites et guess en y
-                lbw_Pt += [Pt_inter[1, int(k // 3)] - 0.3]
-                ubw_Pt += [Pt_inter[1, int(k // 3)] + 0.3]
-                w0_Pt += [Pt_inter[1, int(k // 3)]]
-            if k % 3 == 2:  # limites et guess en z
-                lbw_Pt += [-2]
-                ubw_Pt += [0.5]
-                w0_Pt += [Pt_inter[2, int(k // 3)]]
-
-
-        # pt_trace = np.array(Pt_inter)
-        # fig = plt.figure(1)
-        # ax = fig.add_subplot(111, projection='3d')
-        # ax.set_box_aspect([1.1, 1.8, 1])
-        # ax.plot(pt_trace[0, :], pt_trace[1, :], pt_trace[2, :], '.b')
-        # plt.show()
-
-        return lbw_Pt, ubw_Pt, w0_Pt
-
-    def Vitesse_bounds(Ptavant, Ptapres):
-        """
-        :param Ptavant: instant i-1
-        :param Ptapres: instant i+1
-        :return: bound et init pour les vitesses en i
-        """
-
-        lbw_v = [-30]*405
-        ubw_v = [30]*405
-
-        position_imoins1 = interpolation_collecte_nan(Ptavant, labels)
-        position_iplus1 = interpolation_collecte_nan(Ptapres, labels)
-        distance_xyz = np.abs(position_imoins1 - position_iplus1)
-        vitesse_initiale = distance_xyz / (2 * 0.002)
-        vitesse_initiale = vitesse_initiale.T
-
-        w0_v = []
-        for i in range(135):
-            for j in range(3):
-                w0_v.append(vitesse_initiale[i, j])
-
-        w0_v = [1]*405
-
-        return lbw_v, ubw_v, w0_v
-
-    def Force_bounds():
-        """
-        :return: bounds et init pour la force de l'athlete sur la toile
-        on limite la force sur x et y
-        """
-        ubw_F = [1e5]*15
-        ubw_F[::3] = [1e3]*5
-        ubw_F[1::3] = [1e3]*5
-
-        lbw_F = [-1e5]* 15
-        lbw_F[::3] = [-1e3] * 5
-        lbw_F[1::3] = [-1e3] * 5
-
-        w0_F = [200]*15
-        w0_F[::3] = [20]*5
-        w0_F[1::3] = [20]*5
-
-        return lbw_F, ubw_F, w0_F
-
-    def A_minimiser(X, Xdot, C, F, Masse_centre, Pt_collecte, Force_collecte, force_accel_cadre, labels, ind_masse) :
-        """
-        Fonction objectif, calculée puis évalueée a partir des variables symboliques
-        on minimise :
-        - la positions entre collecte et simulation
-        - la force entre collecte plateforme et simulation
-        """
-
-        Difference = cas.MX.zeros(1)
-        Pt = list2tab(X)
-        vit = list2tab(Xdot)
-
-        # POSITION
-        for i in range(3):
-            for ind in range(n * m):
-                if 't' + str(ind) in labels:
-                    ind_collecte = labels.index('t' + str(ind))
-                    if np.isnan(Pt_collecte[i, ind_collecte]):
-                        do = 'on fait rien sur les nan car pas dinterpolation'
-                    elif ind==ind_masse or ind==ind_masse-1 or ind==ind_masse+1 or ind==ind_masse-15 or ind==ind_masse+15 :
-                        Difference += 500*(Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
-                    else:
-                        Difference += (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
-
-        # FORCE
-        Force_point = Force_totale_points(Pt, vit, C, F, Masse_centre, ind_masse)
-        Force_plateforme = np.zeros((1, 3))
-        Force_plateforme[0, 0] = Force_collecte[0] - force_accel_cadre[0]
-        Force_plateforme[0, 1] = Force_collecte[1] - force_accel_cadre[1]
-        Force_plateforme[0, 2] = Force_collecte[2] + masse_trampo * 9.81 - force_accel_cadre[2]
-
-        for j in range(3):
-            Difference += 1000*(Force_point[0, j] - Force_plateforme[0, j])**2
-
-        output = Difference
-        obj = cas.Function('f', [X, Xdot, C, F], [output]).expand()
-
-        return obj
-
-
-    #######################################
-    #### PREPARATION DE L'OPTIMISATION ####
-    #######################################
-
-    # -- choix pour le fichier c3d
-
-    participant = 2
-    statique_name = 'labeled_statique_leftfront_D7'
-    vide_name = 'labeled_statique_centrefront_vide'
-    trial_name  = 'labeled_p2_troisquartback_01'
-
-    # -- choix de l'intervalle de frame
-    total_frame = 7763
-    # intervalle_dyna = [5170, 5190]
-    intervalle_dyna = [5170, 5173]
-    nb_frame = intervalle_dyna[1] - intervalle_dyna[0]
-
-    # -- définition des parametres fixes
-    masse_ressorts = 8 * 0.553 + 110 * 0.322
-    masse_toile = 5
-    masse_trampo = 270
-    dt = 1 / 500
-    n = 15
-    m = 9
-
-    # -- parametres qui peuvent varier
-    masses = [64.5, 87.2]
-    Masse_centre = masses[0]
-
-    # -- Recuperation parametres du modele
-    dict_fixed_params = Param_fixe(Masse_centre)
-    Pt_ancrage, Pos_repos = Points_ancrage_repos(dict_fixed_params)
-
-
-    # -- Recuperation des donnees de la collecte, pour chaque frame de l'intervalle [k, p]
-    F_totale_collecte, Pt_collecte_tab, labels, ind_masse = Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, intervalle_dyna)
-
-    # -- on recupere les points d'ancrage, sur l'intervalle dynamique [k, p]
-    Pt_ancrage_collecte, label_ancrage = Point_ancrage(Pt_collecte_tab, labels)
-    # accélération frame, de la taille dependant de l'intervalle dynamique et dépendant des points d'ancrage collectés
-    force_acceleration_cadre = Acceleration_cadre(Pt_ancrage_collecte, total_frame).T
-
-    ########################
-    # --- OPTIMISATION --- #
-    ########################
-
-    # -- initialisation
-    w = []
-    w0 = []
-    lbw = []
-    ubw = []
-    objectif = 0
-    g = []
-    lbg = []
-    ubg = []
-
-    # -- variables symbolique a optimiser
-    C_sym = cas.MX.sym('C', 40)
-
-    lbw_C, ubw_C, w0_C, = kC_bounds(C_sym)
-
-    w += [C_sym]
-    lbw += lbw_C
-    ubw += ubw_C
-    w0 += w0_C
-
-    X_sym = cas.MX.sym('X_0', 135 * 3)
-    Xdot_sym = cas.MX.sym('Xdot_0', 135 * 3)
-    F_sym = cas.MX.sym('force_0', 5 * 3)
-
-    lbw_X, ubw_X, w0_X = Pt_bounds(X_sym, Pt_collecte_tab[1] , Pt_ancrage, labels)
-    lbw_Xdot, ubw_Xdot, w0_Xdot = Vitesse_bounds(Pt_collecte_tab[0], Pt_collecte_tab[2])
-    lbw_F, ubw_F, w0_F = Force_bounds()
-
-    w += [X_sym]
-    w += [Xdot_sym]
-    w += [F_sym]
-
-    lbw += lbw_X
-    lbw += lbw_Xdot
-    lbw += lbw_F
-
-    ubw += ubw_X
-    ubw += ubw_Xdot
-    ubw += ubw_F
-
-    w0 += w0_X
-    w0 += w0_Xdot
-    w0 += w0_F
-
-    # -- on boucle sur le nombre de frame apres avoir géré la frame initiale
-    for frame in range(1, nb_frame-1): #[k+1,p-1]
-        # -- Récupérer forces des plateformes
-        Force_plateforme_frame = F_totale_collecte[frame, :] # force plateforme instant i
-        Pt_collecte = Pt_collecte_tab[frame] # pt collecte instant i
-
-        # -- Recuperation force acceleration cadre
-        force_accel_cadre = force_acceleration_cadre[frame-1,:] # force accel instant i, car par la meme taille que les autres array
-
-        # -- on gere l'objectif a l'instant i
-        J = A_minimiser(X_sym, Xdot_sym, C_sym, F_sym, Masse_centre, Pt_collecte, Force_plateforme_frame, force_accel_cadre, labels, ind_masse)
-        objectif += J(X_sym, Xdot_sym, C_sym, F_sym)
-
-        # -- on integre a partir du frame i
-        Pt_integres, V_integrees = Integration(X_sym, Xdot_sym, F_sym, C_sym, Masse_centre, ind_masse)
-
-        # -- definition des nouvelles variables symboliques a l'instant i+1
-        X_sym = cas.MX.sym(f'X_{frame}', 135 * 3)
-        Xdot_sym = cas.MX.sym(f'Xdot_{frame}', 135 * 3)
-        F_sym = cas.MX.sym(f'force_{frame}', 5 * 3)
-
-        lbw_X, ubw_X, w0_X = Pt_bounds(X_sym, Pt_collecte_tab[frame+1], Pt_ancrage, labels)
-        lbw_Xdot, ubw_Xdot, w0_Xdot = Vitesse_bounds(Pt_collecte_tab[frame-1], Pt_collecte_tab[frame+1])
-        lbw_F, ubw_F, w0_F, = Force_bounds()
-
-        w += [X_sym]
-        w += [Xdot_sym]
-        w += [F_sym]
-
-        lbw += lbw_X
-        lbw += lbw_Xdot
-        lbw += lbw_F
-
-        ubw += ubw_X
-        ubw += ubw_Xdot
-        ubw += ubw_F
-
-        w0 += w0_X
-        w0 += w0_Xdot
-        w0 += w0_F
-
-        # -- Contrainte de continuité en tout les points entre la frame i et la frame i+1 (position ET vitesse)
-        for i in range(n*m): # attention aux nan tous les points nexistent pas
-            for j in range(3):
-                g += [Pt_integres[i,j] - X_sym[j::3][i]]
-                g += [V_integrees[i,j] - Xdot_sym[j::3][i]]
-        lbg += [0] * (135 * 3 * 2)
-        ubg += [0] * (135 * 3 * 2)
-
-
-    # -- Creation du solver
-    prob = {'f': objectif, 'x': cas.vertcat(*w), 'g': cas.vertcat(*g)}
-    # opts={"ipopt" : {"linear_solver" : "ma57", "tol" : 1e-4, "constr_viol_tol" : 1e-4, "constr_inf_tol" : 1e-4, "hessian_approximation" : "limited-memory"}}
-    opts = {"ipopt": {"max_iter" :10000, "linear_solver": "ma57"}} #, "tol": 1e-4, "hessian_approximation" : "limited-memory"}}
-    solver = cas.nlpsol('solver', 'ipopt', prob, opts)
-
-    # -- Resolution
-    # sol = solver(x0=w0, lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
-    sol = solver(x0=cas.vertcat(*w0), lbg=cas.vertcat(*lbg), ubg=cas.vertcat(*ubg), lbx=cas.vertcat(*lbw), ubx=cas.vertcat(*ubw))
-    w_opt = sol['x'].full().flatten()
-
-    path ='/home/lim/Documents/Jules/Jules_toile_A2022/Dynamique/Result/Optim_C.plk'
-    with open(path, 'wb') as file:
-        pickle.dump(sol, file)
-        pickle.dump(w0, file)
-        pickle.dump(ubw, file)
-        pickle.dump(lbw, file)
-        pickle.dump(labels, file)
-        pickle.dump(Pt_collecte_tab, file)
-        pickle.dump(F_totale_collecte, file)
-        pickle.dump(sol['f'], file)
-
-    return w_opt
-
-solution = Optimisation()
+
+######################
+######################
+######################
+participant = 2
+statique_name = 'labeled_statique_leftfront_D7'
+vide_name = 'labeled_statique_centrefront_vide'
+trial_name  = 'labeled_p2_troisquartback_01'
+Masse_centre = 64.5
+
+total_frame = 7763
+intervalle_dyna = [5170, 5173]
+nb_frame = intervalle_dyna[1] - intervalle_dyna[0]
+
+dict_fixed_params = Param_fixe(Masse_centre)
+Pt_ancrage, Pos_repos = Points_ancrage_repos(dict_fixed_params)
+
+F_totale_collecte, Pt_collecte_tab, labels, ind_masse = Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, intervalle_dyna)
+
+## - Donnees collectées
+Pt_ancrage_collecte, label_ancrage = Point_ancrage(Pt_collecte_tab, labels)
+
+Pt_collecte_tab[1] = interpolation_collecte_lineaire(Pt_collecte_tab[1], Pt_ancrage, labels)
+Pt_collecte_tab[2] = interpolation_collecte_lineaire(Pt_collecte_tab[2], Pt_ancrage, labels)
+
+
+force_acceleration_cadre = Acceleration_cadre(Pt_ancrage_collecte, total_frame).T
+
+F_obj1 = obj_force(F_totale_collecte[1], force_acceleration_cadre[0])
+F_obj1 = obj_force(F_totale_collecte[2], force_acceleration_cadre[0])
+
+
+
+path = '/home/lim/Documents/Jules/Jules_toile_A2022/Dynamique/Result/Optim_C.plk'
+with open(path, 'rb') as file:
+    sol = pickle.load(file)
+    w0 = pickle.load(file)
+    ubw = pickle.load(file)
+    lbw = pickle.load(file)
+
+solution = np.array((sol['x']))
+objectif = sol['f']
+
+C = solution[:40]
+c_tot = Param_variable(C).reshape((9,15))
+plt.matshow(c_tot)
+plt.title('Reparition des C')
+plt.show()
+C_init = w0[:40]
+
+position1 = solution[40:445].reshape((135,3))
+vitesse1 = solution[445:850].reshape((135,3))
+force1 = solution[850:865].reshape((5,3))
+
+position2 = solution[865:1270].reshape((135,3))
+vitesse2 = solution[1270:1675].reshape((135,3))
+force2 = solution[1675:1690].reshape((5,3))
+
+pos1init = np.array(w0[40:445]).reshape((135,3))
+pos2init = np.array(w0[865:1270]).reshape((135,3))
+
+
+# -- positions -- #
+fig = plt.figure()
+## frame 1
+ax = plt.subplot(1,2,1, projection='3d')
+ax.set_box_aspect([1.1, 1.8, 1])
+ax.plot(0,0,-1.2,'xw')
+# point simulés
+ax.plot(position1[:,0] ,position1[:,1] ,position1[:,2], '+r')
+# point collectés
+ax.plot(Pt_collecte_tab[1][0,:] ,Pt_collecte_tab[1][1,:] ,Pt_collecte_tab[1][2,:], '.b')
+
+
+## frame 2
+ax = plt.subplot(1,2,2, projection='3d')
+ax.set_box_aspect([1.1, 1.8, 1])
+ax.plot(0,0,-1.2,'xw')
+# point collectés
+ax.plot(Pt_collecte_tab[2][0,:] ,Pt_collecte_tab[2][1,:] ,Pt_collecte_tab[2][2,:], '.b')
+# point simulés
+ax.plot(position2[:,0] ,position2[:,1] ,position2[:,2], '+r')
+
+plt.show()
+
+# -- vitesses
+# plt.matshow(vitesse1, aspect='auto')
+# plt.matshow(vitesse2, aspect='auto')
+# plt.show()
+
+
+# afficher forces en chaque point
+F_ready1 = solution[850:865]
+F_ready2 = solution[1675:1690]
+F_instant_t = Force_totale_par_points(position1, vitesse1, C, F_ready1, Masse_centre, ind_masse)
+F_instant_t1 = Force_totale_par_points(position2, vitesse2, C, F_ready2, Masse_centre, ind_masse)
+
+F_tot1 = Force_totale_points(position1, vitesse1, C, F_ready1, Masse_centre, ind_masse)
+
+
+plt.matshow(F_instant_t, aspect='auto')
+plt.matshow(F_instant_t1, aspect='auto')
+plt.show()
+
+
+test = 'test'

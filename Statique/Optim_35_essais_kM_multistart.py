@@ -1202,7 +1202,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
     sol = solver(x0=cas.vertcat(*w0), lbx=cas.vertcat(*lbw),ubx=cas.vertcat(*ubw), lbg=cas.vertcat(*lbg), ubg=cas.vertcat(*ubg))
     w_opt = sol['x'].full().flatten()
 
-    return w_opt, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, sol.get("f")
+    return w_opt, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, sol.get("f"), solver.stats().get("return_status"), solver.stats().get("t_wall_total")
 
 ##########################################################################################################################
 
@@ -1316,7 +1316,7 @@ for multi in range (0,nb_essais_multi):
 
     start_main = time.time()
 
-    Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f = Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initial_guess, min_energie)
+    Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f, status, temps_optim = Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initial_guess, min_energie)
 
     #recuperation et affichage
     k=np.array(Solution[:12])
@@ -1401,3 +1401,4 @@ for multi in range (0,nb_essais_multi):
         pickle.dump(trial_name, file)
         pickle.dump(temps_min, file)
         pickle.dump(Value_init_k, file)
+        pickle.dump(status, file)

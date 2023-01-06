@@ -1,4 +1,6 @@
 '''
+Permet de comparer les valeurs des raideurs
+
 Code permettant de récuperer les donnees des fichiers pickle issus des tests pour chaque essai individuel
 Permet de traiter les donnees : k, m , pt, f ...
 

@@ -1,5 +1,5 @@
 """
-VERIF
+VERIF des resultats des k, par optimisation des positions des points et masses seulement
 """
 
 import casadi as cas

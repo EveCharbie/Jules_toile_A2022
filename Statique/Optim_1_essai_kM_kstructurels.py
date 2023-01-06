@@ -16,6 +16,8 @@ Choisir un frame dans un essai c3d. prendre un frame sur un essai statique ?
 Sur ce frame choisir les points qui ne sont pas nan et prendre ceux la uniquement pour la simu
 optimiser ces X*3 valeurs et les 12k. (on ne peut pas otpimiser les C car pas de vitesse)
 
+ATTENTION DANS CE MODELE LES K OBLIQUES SONT INEXISTANT, k EST DE DIMENSION 8 ET CE SONT LES RESSORTS STRUCTURELS
+
 """
 
 import casadi as cas
