@@ -1,0 +1,10 @@
+
+*.c3d
+
+Data/DataCollection/c3d_files/participant_01/
+
+Data/DataCollection/
+
+Data/Pictures/
+
+*.mp4

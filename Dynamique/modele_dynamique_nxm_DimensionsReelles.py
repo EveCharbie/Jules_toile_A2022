@@ -1,8 +1,7 @@
 """
-Modele dynamique avec deux possibilités d'affichage : subplot en plusieurs instants ou enregistrement de video
-Les ecarts entre les points du maillage (positions au repos) sont ceux mesurés sur le trampo réel
-k issus de la these de Jacques (2008)
-On affiche aussi la force, la position, la vitesse et l'accélération du point auquel on met la masse
+This code presents the error made by using a static model to simulate a dynamic trampoline deformation.
+The static K coefficients were found using static optimization.
+The error is the difference from the integration of the position of the points vs the marker position measured during the data collection.
 """
 
 import numpy as np
@@ -12,16 +11,17 @@ import mpl_toolkits.mplot3d.axes3d as p3
 from ezc3d import c3d
 import seaborn as sns
 from scipy import signal
+from IPython import embed
 
 #####################################################################################################################
-# Le programme dynamique totalement simule fonctionne, mais on veut maintenant
+# Le programme dynamics totalement simule fonctionne, mais on veut maintenant
 # mettre les vraies valeurs des parametres du trampo>
 # FAIT - ecart entre les points de la toile
 # - ecarts entre les points de la toile et ceux du cadre
 # - 8 points du maillage plus fin au centre
-# - vraies longueurs au repos
-# - vraies raideurs et longueurs au repos de la toile
-# - vraies raideurs et longueurs au repos des ressorts du cadre
+# - vraies spring_lengths au repos
+# - vraies raideurs et spring_lengths au repos de la toile
+# - vraies raideurs et spring_lengths au repos des ressorts du cadre
 # - vraies masses en chaque point
 ######################################################################################################################
 """
@@ -48,7 +48,11 @@ Nb_ressorts_horz = n * (m - 1)  # nombre de ressorts horizontaux dans la toile (
 Nb_ressorts_vert = m * (n - 1)  # nombre de ressorts verticaux dans la toile (pas dans le cadre)
 
 
-def longueurs():
+def spring_lengths():
+    """
+    These parameters were measured using the marker positions on an empty trial.
+    For the length of the springs attached to the frame, the length was measured on an unloaded sping with a measuring tape.
+    """
     # de bas en haut :
     dL = (
         np.array(
@@ -133,7 +137,7 @@ def longueurs():
         l_bord_coin,
     )
 
-    # dans la toile : on dit que les longueurs au repos sont les memes que en pretension
+    # dans la toile : on dit que les spring_lengths au repos sont les memes que en pretension
     # ressorts horizontaux internes a la toile :
     l_horz = np.array([dl[j] * np.ones(n) for j in range(1, m)])
     l_horz = np.reshape(l_horz, Nb_ressorts_horz)
@@ -173,7 +177,7 @@ def longueurs():
 
 
 def Param():
-    # k multistart
+    # Optimal K parameters from the static optimization in N/m
 
     k1 = 1.21175669e05
     k2 = 3.20423906e03
@@ -329,20 +333,16 @@ def Points_ancrage_repos(dict_fixed_params):
     L_haut = dict_fixed_params["L_haut"]
     L_bas = dict_fixed_params["L_bas"]
 
-    # repos :
     Pos_repos = np.zeros((n * m, 3))
-
-    # on dit que le point numero 0 est a l'origine
     for j in range(m):
         for i in range(n):
-            # Pos_repos[i + j * n] = np.array([-np.sum(dl[:j + 1]), np.sum(dL[:i + 1]), 0])
             Pos_repos[i + j * n, :] = np.array([-np.sum(dl[: j + 1]), np.sum(dL[: i + 1]), 0])
 
+    # The point 0 is the origin, thus we remove his position from the points position
     Pos_repos_new = np.zeros((n * m, 3))
     for j in range(m):
         for i in range(n):
             Pos_repos_new[i + j * n, :] = Pos_repos[i + j * n, :] - Pos_repos[67, :]
-    # Pos_repos_new = np.copy(Pos_repos)
 
     # ancrage :
     Pt_ancrage = np.zeros((2 * (n + m), 3))
@@ -373,9 +373,9 @@ def Points_ancrage_repos(dict_fixed_params):
     Pt_ancrage[2 * n + m + 7, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[2:5]), 0, 0])
     Pt_ancrage[2 * n + m + 8, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[1:5]), 0, 0])
 
-    Pt_ancrage = rotation_points(Pt_ancrage)
+    Pt_ancrage, Pos_repos_new = rotation_points(Pt_ancrage, Pos_repos_new)
 
-    return Pt_ancrage, Pos_repos
+    return Pt_ancrage, Pos_repos_new
 
 
 def Spring_bouts_repos(Pos_repos, Pt_ancrage, time, Nb_increments):
@@ -554,12 +554,9 @@ def Spring_bouts_croix(Pt, time, Nb_increments):
     return Spring_bout_croix_1, Spring_bout_croix_2
 
 
-def rotation_points(Pt_ancrage):  # (Pt_ancrage, Pos_repos)
+def rotation_points(Pt_ancrage, Pos_repos):
     """
-    Appliquer la rotation pour avoir la même orientation que les points de la collecte
-    :param Pos_repos: cas.DM(n*m,3): coordonnées (2D) des points de la toile
-    :param Pt_ancrage: cas.DM(2*n+2*m,3): coordonnées des points du cadre
-    :return: Pos_repos, Pt_ancrage
+    Apply a rotation matrix to the points to get the same orientation as the real markers from the data collection.
     """
 
     mat_base_collecte = np.array(
@@ -579,11 +576,11 @@ def rotation_points(Pt_ancrage):  # (Pt_ancrage, Pos_repos)
             Pt_ancrage[index, :], mat_base_inv_np
         )  # multplication de matrices en casadi
 
-    # Pos_repos_new = np.zeros((n * m, 3))
-    # for index in range(n * m):
-    #     Pos_repos_new[index, :] = np.matmul(Pos_repos[index, :], mat_base_inv_np)
+    Pos_repos_new = np.zeros((n * m, 3))
+    for index in range(n * m):
+        Pos_repos_new[index, :] = np.matmul(Pos_repos[index, :], mat_base_inv_np)
 
-    return Pt_ancrage_new  # , Pos_repos_new
+    return Pt_ancrage_new, Pos_repos_new
 
 
 def rotation_points2(Pt_ancrage, Pos_repos):
@@ -767,20 +764,17 @@ def Force_point(
     return F_point
 
 
-def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, intervalle_dyna):
+def Resultat_PF_collecte(participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval):
     def open_c3d(participant, trial_name):
-        dossiers = ["c3d/statique", "c3d/participant_01", "c3d/participant_02", "c3d/", "c3d/test_plateformes"]
-        # file_path = '/home/lim/Documents/Thea/UDEM_S2M_Thea_WIP/collecte/' + dossiers[participant]
-        # c3d_file = c3d(file_path + '/' + trial_name + '.c3d')
-
-        file_path = (
-            "/home/lim/Documents/Thea/UDEM_S2M_Thea_WIP/collecte/c3d/participant_02/labeled_p2_troisquartback_01.c3d"
-        )
-        c3d_file = c3d(file_path)
-
+        dossiers = ["statique", "participant_01", "participant_02"]
+        file_path = '../Data/DataCollection/c3d_files/' + dossiers[participant]
+        c3d_file = c3d(file_path + '/' + trial_name + '.c3d')
         return c3d_file
 
     def matrices():
+        """
+        Calibration matrices to apply to the force plates.
+        """
         # M1,M2,M4 sont les matrices obtenues apres la calibration sur la plateforme 3
         M4_new = [
             [5.4526, 0.1216, 0.0937, -0.0001, -0.0002, 0.0001],
@@ -818,7 +812,7 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
             [0, 0, 0, 0, 0, 0.5791],
         ]
 
-        # zeros donnes par Nexus
+        # Experimental zero given by Nexus
         zeros1 = np.array([1.0751899, 2.4828501, -0.1168980, 6.8177500, -3.0313399, -0.9456340])
         zeros2 = np.array([0.0, -2.0, -2.0, 0.0, 0.0, 0.0])
         zeros3 = np.array([0.0307411, -5.0, -4.0, -0.0093422, -0.0079338, 0.0058189])
@@ -827,6 +821,9 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
         return M1_new, M2_new, M3_new, M4_new, zeros1, zeros2, zeros3, zeros4
 
     def matrices_rotation():
+        """
+        Rotation matrices to apply to the force plates due to imperfect alignement of the force plates.
+        """
         theta31 = 0.53 * np.pi / 180
         rot31 = np.array([[np.cos(theta31), -np.sin(theta31)], [np.sin(theta31), np.cos(theta31)]])
 
@@ -856,7 +853,7 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
         platform = np.array([platform1, platform2, platform3, platform4])
         return platform
 
-    def soustraction_zero(platform):  # soustrait juste la valeur du debut aux raw values
+    def soustracting_the_zero_from_force_paltes(platform):  # soustrait juste la valeur du debut aux raw values
         longueur = np.size(platform[0, 0])
         zero_variable = np.zeros((4, 6))
         for i in range(6):
@@ -865,8 +862,8 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
                 platform[j, i, :] = platform[j, i, :] - zero_variable[j, i] * np.ones(longueur)
         return platform
 
-    def plateforme_calcul(
-        platform, intervalle_dyna, participant
+    def force_plates_rearangement(
+        platform, jump_frame_index_interval, participant
     ):  # prend les plateformes separees, passe les N en Nmm, calibre, multiplie par mat rotation, met dans la bonne orientation
         M1, M2, M3, M4, zeros1, zeros2, zeros3, zeros4 = matrices()
         rot31, rot34, rot32 = matrices_rotation()
@@ -898,11 +895,11 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
                 platform_new[:, :, i // 4] = platform[:, :, i]
 
         if participant != 0:
-            platform_new = platform_new[:, :, intervalle_dyna[0] : intervalle_dyna[1]]
+            platform_new = platform_new[:, :, jump_frame_index_interval[0] : jump_frame_index_interval[1]]
 
         return platform_new
 
-    def soustraction_vide(c3d_statique, c3d_vide):  # pour les forces calculees par Vicon
+    def soustracting_zero_from_force_plates(c3d_statique, c3d_vide):  # pour les forces calculees par Vicon
         platform_statique = plateformes_separees_rawpins(c3d_statique)
         platform_vide = plateformes_separees_rawpins(c3d_vide)
         platform = np.copy(platform_statique)
@@ -911,16 +908,16 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
         for j in range(6):
             for i in range(4):
                 platform[i, j, :] = platform_statique[i, j, :] - np.mean(platform_vide[i, j, :])
-        platform = plateforme_calcul(platform, 0, 0)
+        platform = force_plates_rearangement(platform, 0, 0)
         return platform
 
-    def dynamique(c3d_experimental, intervalle_dyna, participant):
+    def dynamics(c3d_experimental, jump_frame_index_interval, participant):
         platform = plateformes_separees_rawpins(c3d_experimental)
-        platform = soustraction_zero(platform)
-        platform = plateforme_calcul(platform, intervalle_dyna, participant)
+        platform = soustracting_the_zero_from_force_paltes(platform)
+        platform = force_plates_rearangement(platform, jump_frame_index_interval, participant)
         return platform
 
-    def Named_markers(c3d_experimental):
+    def named_markers(c3d_experimental):
         labels = c3d_experimental["parameters"]["POINT"]["LABELS"]["value"]
 
         indices_supp = []
@@ -941,7 +938,7 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
 
         return labels, moyenne_milieu, named_positions
 
-    def position_statique(named_positions, moyenne, named_positions_vide, moyenne_vide):
+    def static_positions(named_positions, moyenne, named_positions_vide, moyenne_vide):
         # on soustrait la moyenne de la position du milieu
         for i in range(3):
             named_positions[i, :, :] = named_positions[i, :, :] - moyenne_vide[i]
@@ -962,7 +959,7 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
 
         return named_positions_bonsens
 
-    def position_dynamique(named_positions, moyenne_milieu, intervalle_dyna):
+    def dynamics_position(named_positions, moyenne_milieu, jump_frame_index_interval):
         # on soustrait la moyenne de la position du milieu sur les 100 premiers points
         for i in range(3):
             named_positions[i, :, :] = named_positions[i, :, :] - moyenne_milieu[i]
@@ -981,23 +978,23 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
         # passage de mm en m :
         named_positions_bonsens *= 0.001
 
-        positions_new = named_positions_bonsens[:, :, intervalle_dyna[0] : intervalle_dyna[1]]
+        positions_new = named_positions_bonsens[:, :, jump_frame_index_interval[0] : jump_frame_index_interval[1]]
 
         return positions_new
 
-    def point_le_plus_bas(points, labels, intervalle_dyna):
+    def find_lowest_marker(points, labels, jump_frame_index_interval):
         """
 
         :param points: liste des 3 coordonnées des points labelisés pour sur l'intervalle de frame
         :param labels: labels des points des essais a chaque frame
-        :param intervalle_dyna: intervalle de frame choisi
+        :param jump_frame_index_interval: intervalle de frame choisi
         :return:
         le min ???? a voir
         """
         idx_min = []
         position_min = []
         labels_min = []
-        for frame in range(0, intervalle_dyna[1] - intervalle_dyna[0]):
+        for frame in range(0, jump_frame_index_interval[1] - jump_frame_index_interval[0]):
             minimum_cal = np.nanargmin(points[2, :, frame])
             position_min.append(np.nanmin(points[2, :, frame]))
             idx_min.append(minimum_cal)
@@ -1010,8 +1007,8 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
         # #compter le nombre de nan par marqueur au cours de l'intervalle :
         # isnan_marqueur = np.zeros(len(labels))
         # for i in range (len(labels)) :
-        #     # for time in range (intervalle_dyna[0], intervalle_dyna[1]) :
-        #     for time in range(intervalle_dyna[1] - intervalle_dyna[0]):
+        #     # for time in range (jump_frame_index_interval[0], jump_frame_index_interval[1]) :
+        #     for time in range(jump_frame_index_interval[1] - jump_frame_index_interval[0]):
         #         if np.isnan(points[2, i,time])==True :
         #             isnan_marqueur[i] += 1
         #
@@ -1019,7 +1016,7 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
         # labels_notnan = []
         # for i in range (len(labels)):
         #     #s'il y a autant de nan que de points dans l'intervalle, alors on n'en veut pas  = on enleve les marqueurs qui n'ont pas ete detecté
-        #     if isnan_marqueur[i] != intervalle_dyna[1] - intervalle_dyna[0] :
+        #     if isnan_marqueur[i] != jump_frame_index_interval[1] - jump_frame_index_interval[0] :
         #         labels_notnan += [labels[i]]
         #
         # indice_notnan= []
@@ -1031,7 +1028,7 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
         #
         # #on peut enfin calculer le minimum :
         # # on cherche le z min de chaque marqueur (on en profite pour supprimer les nan)
-        # # minimum_marqueur = [np.nanmin(points_modified[2, i,intervalle_dyna[0] : intervalle_dyna[1]]) for i in range(len(indice_notnan))]
+        # # minimum_marqueur = [np.nanmin(points_modified[2, i,jump_frame_index_interval[0] : jump_frame_index_interval[1]]) for i in range(len(indice_notnan))]
         # minimum_marqueur = [np.nanmin(points_modified[2, i, :]) for i in range(len(indice_notnan))]
         #
         # #indice du marqueur ayant le plus petit z sur tout l'intervalle
@@ -1042,20 +1039,20 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
         return idx_min_dynamique, label_min_dynamique
 
     if participant == 0:
-        c3d_vide = open_c3d(0, vide_name)
-        c3d_statique = open_c3d(0, statique_name)
-        platform = soustraction_vide(
+        c3d_vide = open_c3d(0, empty_trial_name)
+        c3d_statique = open_c3d(0, static_trial_name)
+        platform = soustracting_zero_from_force_plates(
             c3d_statique, c3d_vide
         )  # plateforme statique a laquelle on a soustrait la valeur de la plateforme a vide
-        labels, moyenne_milieu, named_positions = Named_markers(c3d_statique)
-        labels_vide, moyenne_milieu_vide, named_positions_vide = Named_markers(c3d_vide)
-        Pt_collecte = position_statique(named_positions, moyenne_milieu, named_positions_vide, moyenne_milieu_vide)
+        labels, moyenne_milieu, named_positions = named_markers(c3d_statique)
+        labels_vide, moyenne_milieu_vide, named_positions_vide = named_markers(c3d_vide)
+        Pt_collecte = static_positions(named_positions, moyenne_milieu, named_positions_vide, moyenne_milieu_vide)
 
     else:
         c3d_experimental = open_c3d(participant, trial_name)
-        platform = dynamique(c3d_experimental, intervalle_dyna, participant)
-        labels, moyenne_milieu, named_positions = Named_markers(c3d_experimental)
-        Pt_collecte = position_dynamique(named_positions, moyenne_milieu, intervalle_dyna)
+        platform = dynamics(c3d_experimental, jump_frame_index_interval, participant)
+        labels, moyenne_milieu, named_positions = named_markers(c3d_experimental)
+        Pt_collecte = dynamics_position(named_positions, moyenne_milieu, jump_frame_index_interval)
 
     longueur = np.size(platform[0, 0])
     F_totale_collecte = np.zeros((longueur, 3))
@@ -1064,11 +1061,11 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
             F_totale_collecte[x, i] = platform[0, i, x] + platform[1, i, x] + platform[2, i, x] + platform[3, i, x]
 
     # position_instant = Pt_collecte[:, :, int(7050)]
-    argmin_marqueur, label_min = point_le_plus_bas(
-        Pt_collecte, labels, intervalle_dyna
+    argmin_marqueur, label_min = find_lowest_marker(
+        Pt_collecte, labels, jump_frame_index_interval
     )  # coordonnée du marqueur le plus bas dans labels
     ind_marqueur_min = int(label_min[1:])  # coordonnées de ce marqueur adaptées à la simulation
-    print("Point le plus bas sur l'intervalle " + str(intervalle_dyna) + " : " + str(label_min))
+    print("Point le plus bas sur l'intervalle " + str(jump_frame_index_interval) + " : " + str(label_min))
 
     # retourner des tableaux casadi
     F_collecte_cas = np.zeros(np.shape(F_totale_collecte))
@@ -1087,7 +1084,7 @@ def Resultat_PF_collecte(participant, statique_name, vide_name, trial_name, inte
 
 def Point_ancrage(Point_collecte, labels):
     """
-    :param Point_collecte: ensemble des points de collecte de l'intervalle dynamique
+    :param Point_collecte: ensemble des points de collecte de l'intervalle dynamics
     :param labels: labels des points
     :return:
     ensemble des coordonnées des points d'ancrage a chaque frame (point du cadre avec label C) sous forme de tableaux
@@ -1120,7 +1117,7 @@ def Point_ancrage(Point_collecte, labels):
 
 def Point_toile_init(Point_collecte, labels):
     """
-    :param Point_collecte: ensemble des points de collecte de l'intervalle dynamique
+    :param Point_collecte: ensemble des points de collecte de l'intervalle dynamics
     :param labels: labels des points
     :return:
     ensemble des coordonnées des points a chaque frame
@@ -1164,7 +1161,7 @@ def interpolation_collecte(Pt_collecte, labels):
 def Bouts_ressort_collecte(Pt_interpolés, nb_frame):
     """
     :param Pt_interpolés: point collecte
-    :param nb_frame: nombre de frame dans l'intervalle dynamique
+    :param nb_frame: nombre de frame dans l'intervalle dynamics
 
     :return: bouts des ressorts, coordonnées
     """
@@ -1200,7 +1197,7 @@ def Affichage_points_collecte_t(Pt_toile, Pt_ancrage, Ressort, nb_frame, ind_mas
         Pt_toile[1, ind_masse],
         Pt_toile[2, ind_masse],
         "og",
-        label="Point le plus bas sur l'intervalle dynamique",
+        label="Point le plus bas sur l'intervalle dynamics",
     )
 
     if Ressort == True:
@@ -1241,10 +1238,10 @@ def Affichage_points_collecte_t(Pt_toile, Pt_ancrage, Ressort, nb_frame, ind_mas
 
 def Etat_initial(Ptavant, Ptapres, labels):
     """
-    :param Pt intervalle dynamique
+    :param Pt intervalle dynamics
     :param labels
     :return:
-    vitesse initiale a l'instant -1, de la frame 0 de l'intervalle dynamique
+    vitesse initiale a l'instant -1, de la frame 0 de l'intervalle dynamics
     """
 
     position_imoins1 = interpolation_collecte(Ptavant, labels)
@@ -1266,30 +1263,26 @@ def erreurs(Pt_intergres, Pt_frame2):
     position_iplus1 = interpolation_collecte(Pt_frame2, labels)
     point_theorique = position_iplus1.T
 
-    err_abs = (np.abs(point_theorique - Pt_intergres) / point_theorique) * 100
-    err_rel = np.abs(point_theorique - Pt_intergres)
+    err_rel = (np.abs(point_theorique - Pt_intergres) / point_theorique)
+    err_abs = np.abs(point_theorique - Pt_intergres)
 
-    # print('erreur relative : '+ str(err_rel))
-    # print('erreur absolue : ' + str(err_abs))
+    print('STD relative error : ' + str(np.nanstd(np.linalg.norm(err_rel, axis=1))))
+    print('STD absolute error : ' + str(np.nanstd(np.linalg.norm(err_abs, axis=1))))
 
     return err_rel, err_abs
 
 
-def update(time, Pt, markers_point):
+def update(time, Pt_integrated, Pt_markers, integrated_point, markers_point):
+
+    for i_point in range(len(integrated_point)):
+        integrated_point[i_point][0].set_data(np.array([Pt_integrated[time, i_point, 0]]), np.array([Pt_integrated[time, i_point, 1]]))
+        integrated_point[i_point][0].set_3d_properties(np.array([Pt_integrated[time, i_point, 2]]))
+
     for i_point in range(len(markers_point)):
-        markers_point[i_point][0].set_data(np.array([Pt[time, i_point, 0]]), np.array([Pt[time, i_point, 1]]))
-        markers_point[i_point][0].set_3d_properties(np.array([Pt[time, i_point, 2]]))
+        markers_point[i_point][0].set_data(np.array([Pt_markers[time][0, i_point]]), np.array([Pt_markers[time][1, i_point]]))
+        markers_point[i_point][0].set_3d_properties(np.array([Pt_markers[time][2, i_point]]))
+
     return
-
-
-def updatemulti(time, Pt, markers_point):
-    for i_point in range(134):
-        markers_point[0][i_point][0].set_data(np.array([Pt[0][time, i_point, 0]]), np.array([Pt[0][time, i_point, 1]]))
-        markers_point[0][i_point][0].set_3d_properties(np.array([Pt[0][time, i_point, 2]]))
-        markers_point[1][i_point][0].set_data(np.array([Pt[1][time, i_point, 0]]), np.array([Pt[1][time, i_point, 1]]))
-        markers_point[1][i_point][0].set_3d_properties(np.array([Pt[1][time, i_point, 2]]))
-    return
-
 
 def Integration(nb_frame, Pt_collecte_tab, labels, Masse_centre):
     """
@@ -1359,16 +1352,16 @@ def Integration(nb_frame, Pt_collecte_tab, labels, Masse_centre):
     return Pt_tot, erreur_relative, erreur_absolue, F_all_point, v_all
 
 
-def Animation(Pt_tot, intervalle_dyna):
+def Animation(Pt_integres, Pt_collecte_tab, jump_frame_index_interval):
     fig = plt.figure()
     ax = p3.Axes3D(fig, auto_add_to_figure=False)
     fig.add_axes(ax)
     ax.axes.set_xlim3d(left=-2, right=2)
     ax.axes.set_ylim3d(bottom=-2.2, top=2.2)
     ax.axes.set_zlim3d(bottom=-2.5, top=0.5)
-    ax.set_xlabel("x (m)")
-    ax.set_ylabel("y (m)")
-    ax.set_zlabel("z (m)")
+    ax.set_xlabel("X [m]")
+    ax.set_ylabel("Y [m]")
+    ax.set_zlabel("Z [m]")
 
     colors_colormap = sns.color_palette(palette="viridis", n_colors=n * m)
     colors = [[] for i in range(n * m)]
@@ -1379,15 +1372,16 @@ def Animation(Pt_tot, intervalle_dyna):
         colors[i] = (col_0, col_1, col_2)
 
     ax.set_box_aspect([1.1, 1.8, 1])
-    frame_range = intervalle_dyna
-    markers_point = [ax.plot(0, 0, 0, ".", color=colors[i]) for i in range(n * m)]
+    integrated_point = [ax.plot(0, 0, 0, '.', mfc='none', color=colors[i]) for i in range(n * m)]
+    marker_point = [ax.plot(0, 0, 0, ".", markersize=5,  color=colors[i]) for i in range(Pt_collecte_tab[0].shape[1])]
 
+    nb_frame = jump_frame_index_interval[1] - jump_frame_index_interval[0] - 1
     animate = animation.FuncAnimation(
-        fig, update, frames=frame_range[1] - frame_range[0], fargs=(Pt_tot[:159], markers_point), blit=False
+        fig, update, frames=nb_frame, fargs=(Pt_integres, Pt_collecte_tab, integrated_point, marker_point), blit=False
     )
     output_file_name = "simulation.mp4"
 
-    animate.save(output_file_name, fps=20, extra_args=["-vcodec", "libx264"])
+    animate.save(output_file_name, fps=20)
     plt.show()
 
 
@@ -1395,102 +1389,118 @@ def Animation(Pt_tot, intervalle_dyna):
 ###############################################################################
 ###############################################################################
 
-# RÉSULTATS COLLECTE :
+# SELECTION OF THE RESULTS FROM THE DATA COLLECTION
 participant = 1
-statique_name = "labeled_statique_leftfront_D7"
+static_trial_name = "labeled_statique_leftfront_D7"
 trial_name = "labeled_p1_sauthaut_01"
-vide_name = "labeled_statique_centrefront_vide"
-
-intervalle_dyna = [
+empty_trial_name = "labeled_statique_centrefront_vide"
+jump_frame_index_interval = [
     7000,
     7170,
-]  # dépend de l'essai (utiliser plateforme_verification_toutesversions pour toruver l'intervalle)
-nb_frame = intervalle_dyna[1] - intervalle_dyna[0] - 1  # on exclut la premiere frame
-dt = 0.002
-dict_fixed_params = longueurs()
+]  # This range repends on the trial. To find it, one should use the code plateforme_verification_toutesversions.py.
+dt = 1/500  # Hz
 
-# Récupération de tous les points des frames de l'intervalle dynamique
+nb_frame = jump_frame_index_interval[1] - jump_frame_index_interval[0] - 1  # The first frame is excluded
+dict_fixed_params = spring_lengths()
+
+# Récupération de tous les points des frames de l'intervalle dynamics
 F_totale_collecte, Pt_collecte_tab, labels, ind_masse = Resultat_PF_collecte(
-    participant, statique_name, vide_name, trial_name, intervalle_dyna
+    participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval
 )
 
 # Récupération des parametres du problemes
 k, k_oblique, M, C = Param()
-# Pt_ancrage_repos, pos_repos = Points_ancrage_repos(dict_fixed_params)
+Pt_ancrage_repos, pos_repos = Points_ancrage_repos(dict_fixed_params)
 
-# Pt_interpoles = interpolation_collecte(Pt_collecte_tab[0], labels)
-#
-# Pt_integres ,erreur_relative ,erreur_absolue ,force_points, v_all = Integration(nb_frame, Pt_collecte_tab, labels, Masse_centre)
-#
-# Pt_ancrage_collecte, labels_ancrage = Point_ancrage(Pt_collecte_tab, labels)
-# Pt_toile_collecte = Point_toile_init(Pt_collecte_tab, labels)
-#
-# Pt_ancrage_collecte= Pt_ancrage_collecte[0]
-# Pt_toile_collecte = Pt_toile_collecte[0].T
+Pt_interpoles = interpolation_collecte(Pt_collecte_tab[0], labels)
 
+Pt_integres, erreur_relative, erreur_absolue, force_points, v_all = Integration(nb_frame, Pt_collecte_tab, labels, Masse_centre)
 
-# fig = plt.figure(0)
-# ax = fig.add_subplot(111, projection='3d')
-# ax.set_box_aspect([1.1, 1.8, 1])
-# ax.plot(0, 0, -1.2, 'ow')  # mettre a une echelle lisible et reelle
-#
-# ax.plot(Pt_ancrage_repos[:, 0], Pt_ancrage_repos[:, 1], Pt_ancrage_repos[:, 2], 'ok', label = 'Point du cadre ')
-# ax.plot(pos_repos.T[0, :], pos_repos.T[1, :], pos_repos.T[2, :], 'ob', label='Point de la toile')
+Pt_ancrage_collecte, labels_ancrage = Point_ancrage(Pt_collecte_tab, labels)
+Pt_toile_collecte = Point_toile_init(Pt_collecte_tab, labels)
 
-# afficher les points d'ancrage et les points de la toile avec des couleurs differentes
-# ax.plot(Pt_ancrage_collecte[:, 0], Pt_ancrage_collecte[:, 1], Pt_ancrage_collecte[:, 2], 'ok', label = 'Point du cadre ')
-# ax.plot(Pt_toile_collecte[0, :], Pt_toile_collecte[1, :], Pt_toile_collecte[2, :], 'ob', label='Point de la toile')
-# ax.plot(Pt_toile_collecte[0, ind_masse], Pt_toile_collecte[1, ind_masse], Pt_toile_collecte[2, ind_masse], 'og', label='Point le plus bas sur l\'intervalle dynamique')
-# ax.plot(Pt_ancrage[:, 0], Pt_ancrage[:, 1], Pt_ancrage[:, 2], '+r', label = 'Point du cadre ')
-# plt.show()
-# Animation(Pt_integres, intervalle_dyna)
-Pt_ancrage_repos, pos_repos = Points_ancrage_fix(dict_fixed_params)
+Pt_ancrage_collecte = Pt_ancrage_collecte[0]
+Pt_toile_collecte = Pt_toile_collecte[0].T
 
 
+# Plot the position of the markers vs model points at the initial instant
+fig = plt.figure(0)
+ax = fig.add_subplot(111, projection='3d')
+ax.set_box_aspect([1.1, 1.8, 1])
+ax.plot(0, 0, -1.2, 'ow')
+
+ax.plot(Pt_ancrage_repos[:, 0], Pt_ancrage_repos[:, 1], Pt_ancrage_repos[:, 2], '.k', mfc='none', alpha=0.5, label='Model Frame')
+ax.plot(pos_repos.T[0, :], pos_repos.T[1, :], pos_repos.T[2, :], '.b', mfc='none', alpha=0.5, label='Model Trampline')
+
+ax.plot(Pt_ancrage_collecte[:, 0], Pt_ancrage_collecte[:, 1], Pt_ancrage_collecte[:, 2], '.k', label='Experimental Frame')
+ax.plot(Pt_toile_collecte[0, :], Pt_toile_collecte[1, :], Pt_toile_collecte[2, :], '.b', label='Experimental Trampoline')
+ax.plot(Pt_toile_collecte[0, ind_masse], Pt_toile_collecte[1, ind_masse], Pt_toile_collecte[2, ind_masse], '.g', label='Lowest point on the interval')
+
+ax.set_title("Data collection markers vs model points")
+ax.legend()
+plt.show()
+
+
+# # Animation of the markers vs integrated marker position
+# Animation(Pt_integres, Pt_collecte_tab, jump_frame_index_interval)
+
+
+# Plot the model and springs at the initial instant
 Affichage_points_collecte_t(pos_repos.T, Pt_ancrage_repos, True, nb_frame, ind_masse)
 plt.show()
 
 
 all_F_totale_collecte, all_Pt_collecte_tab, all_labels, all_ind_masse = Resultat_PF_collecte(
-    participant, statique_name, vide_name, trial_name, [0, 7763]
+    participant, static_trial_name, empty_trial_name, trial_name, [0, 7763]
 )
 all_Pt_ancrage_collecte, label_ancrage = Point_ancrage(all_Pt_collecte_tab, all_labels)
 
 
-# calcul acceleration par double diff finie :
-# a = (zi+1 + z1-1 - 2zi)/dt**2
+# Plot the exeprimental forces vs model forces
+
+time = np.linspace(0,10,6850)
+time2 = np.linspace(0,10,6848)
+
+z = [np.array([0]) for i_frame in range(len(all_Pt_ancrage_collecte))]
+z_filtered = [np.array([0]) for i_frame in range(len(all_Pt_ancrage_collecte))]
+az = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
+for i_marker in range(all_Pt_ancrage_collecte[0].shape[0]):
+    first_non_nan_hit = False
+    for i_frame in range(len(all_Pt_ancrage_collecte)):
+        if np.isnan(all_Pt_ancrage_collecte[i_frame][i_marker, 2]):
+            if not first_non_nan_hit:
+                continue
+            else:
+                z[i_marker] = np.vstack((z[i_marker], z[i_marker][-1]))
+        else:
+            z[i_marker] = np.vstack((z[i_marker], all_Pt_ancrage_collecte[i_frame][i_marker, 2]))
+            first_non_nan_hit = True
+    z[i_marker] = z[i_marker][1:]
+
+    a, b = signal.butter(4, 0.015)
+    z_filtered[i_marker] = signal.filtfilt(a, b, z[i_marker], method="gust")
+
+    for pos in range(1, len(z_filtered)-1):
+        az[i_marker] = ((z_filtered[pos+1]+z_filtered[pos-1]-2*z_filtered[pos])/(dt*dt))
 
 
-axe = 11
-# time = np.linspace(0,10,6850)
-# time2 = np.linspace(0,10,6848)
-#
-# z = []
-# az = []
-# for i in all_Pt_ancrage_collecte:
-#     z.append(i[:,2])
-#
-#
-#
-# a,b =signal.butter(4, 0.015)
-# zfil = signal.filtfilt(a,b,z[:6850], method="gust")
-#
-# for pos in range(1,len(zfil)-1):
-#     az.append(((zfil[pos+1]+zfil[pos-1]-2*zfil[pos])/(dt*dt))*270)
-#
-#
-#
-# fig , ax = plt.subplots(2,1)
-# fig.suptitle('Position sur Z du point d\'ancrage')
-# ax[0].plot(time, z[:6850])
-# ax[0].plot(time, zfil, '-r')
-# ax[0].set_xlabel('Temps (s)')
-# ax[0].set_ylabel('Z (m)')
-# ax[1].plot(time2, az)
-# ax[1].set_xlabel('Temps (s)')
-# ax[1].set_ylabel('accel Z (m.s-2)')
-#
-#
+
+
+##### Plot the force !!
+# ici
+
+
+fig , ax = plt.subplots(2,1)
+fig.suptitle('Position sur Z du point d\'ancrage')
+ax[0].plot(time, z)
+ax[0].plot(time, zfil, '-r')
+ax[0].set_xlabel('Temps (s)')
+ax[0].set_ylabel('Z (m)')
+ax[1].plot(time2, az)
+ax[1].set_xlabel('Temps (s)')
+ax[1].set_ylabel('accel Z (m.s-2)')
+
+
 
 
 time = np.linspace(0, 10, 7763)
@@ -1516,57 +1526,5 @@ axes[1].set_ylabel("Y (m)")
 axes[2].plot(time, z)
 axes[2].set_xlabel("Temps (s)")
 axes[2].set_ylabel("Z (m)")
-
-
-# fig2 = plt.figure(1)
-# fig2.suptitle('Position sur Y du point d\'ancrage')
-# ax2 = fig2.add_subplot(111)
-# ax2.plot(time, y)
-# ax2.set_xlabel('Temps (s)')
-# ax2.set_ylabel('Y (m)')
-#
-#
-# fig3 = plt.figure(2)
-# fig3.suptitle('Position sur X du point d\'ancrage')
-# ax3 = fig3.add_subplot(111)
-# ax3.plot(time, x)
-# ax3.set_xlabel('Temps (s)')
-# ax3.set_ylabel('X (m)')
-
 plt.show()
 
-ok = 2
-
-
-# ---2 ANIMATIONS simultatne---#
-# fig=plt.figure()
-# ax = p3.Axes3D(fig, auto_add_to_figure=False)
-# fig.add_axes(ax)
-# ax.axes.set_xlim3d(left=-2, right=2)
-# ax.axes.set_ylim3d(bottom=-3, top=3)
-# ax.axes.set_zlim3d(bottom=-2.5, top=0.5)
-# ax.set_xlabel('x (m)')
-# ax.set_ylabel('y (m)')
-# ax.set_zlabel('z (m)')
-#
-# colors_colormap = sns.color_palette(palette="viridis", n_colors=n*m)
-# colors = [[] for i in range(n*m)]
-# for i in range(n*m):
-#     col_0 = colors_colormap[i][0]
-#     col_1 = colors_colormap[i][1]
-#     col_2 = colors_colormap[i][2]
-#     colors[i] = (col_0, col_1, col_2)
-#
-# ax.set_box_aspect([1.1, 1.8, 1])
-# frame_range = [7010, 7170]
-# # markers_point = [ax.plot(0, 0, 0, '.',color=colors[i]) for i in range(n*m)]
-#
-# markers_pointsv = [ax.plot(0, 0, 0, '.c') for i in range(n*m)]
-# markers_point = [ax.plot(0, 0, 0, '.m') for i in range(n*m)]
-#
-# marker_tot = [markers_point, markers_pointsv]
-#
-# animate2=animation.FuncAnimation(fig, updatemulti, frames=frame_range[1] - frame_range[0], fargs=([Pt_tot[:159], Pt_totsv[:159]], marker_tot))
-# output_file_name = 'simulation.mp4'
-# animate2.save(output_file_name, fps=20, extra_args=['-vcodec', 'libx264'])
-# plt.show()
