@@ -1457,13 +1457,11 @@ all_Pt_ancrage_collecte, label_ancrage = Point_ancrage(all_Pt_collecte_tab, all_
 
 
 # Plot the exeprimental forces vs model forces
-
-time = np.linspace(0,10,6850)
-time2 = np.linspace(0,10,6848)
-
-z = [np.array([0]) for i_frame in range(len(all_Pt_ancrage_collecte))]
-z_filtered = [np.array([0]) for i_frame in range(len(all_Pt_ancrage_collecte))]
+time = np.linspace(0, len(all_Pt_ancrage_collecte)*dt, len(all_Pt_ancrage_collecte)+1)
+z = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
+z_filtered = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
 az = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
+times_without_nans = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
 for i_marker in range(all_Pt_ancrage_collecte[0].shape[0]):
     first_non_nan_hit = False
     for i_frame in range(len(all_Pt_ancrage_collecte)):
@@ -1475,56 +1473,27 @@ for i_marker in range(all_Pt_ancrage_collecte[0].shape[0]):
         else:
             z[i_marker] = np.vstack((z[i_marker], all_Pt_ancrage_collecte[i_frame][i_marker, 2]))
             first_non_nan_hit = True
+            times_without_nans[i_marker] = np.vstack((times_without_nans[i_marker], time[i_frame]))
     z[i_marker] = z[i_marker][1:]
+    times_without_nans[i_marker] = times_without_nans[i_marker][1:]
 
     a, b = signal.butter(4, 0.015)
     z_filtered[i_marker] = signal.filtfilt(a, b, z[i_marker], method="gust")
-
-    for pos in range(1, len(z_filtered)-1):
-        az[i_marker] = ((z_filtered[pos+1]+z_filtered[pos-1]-2*z_filtered[pos])/(dt*dt))
-
-
-
-
-##### Plot the force !!
-# ici
+    az[i_marker] = ((z_filtered[i_marker][2:]+z_filtered[i_marker][:-2]-2*z_filtered[i_marker][1:-1])/(dt*dt))
 
 
 fig , ax = plt.subplots(2,1)
-fig.suptitle('Position sur Z du point d\'ancrage')
-ax[0].plot(time, z)
-ax[0].plot(time, zfil, '-r')
-ax[0].set_xlabel('Temps (s)')
-ax[0].set_ylabel('Z (m)')
-ax[1].plot(time2, az)
-ax[1].set_xlabel('Temps (s)')
-ax[1].set_ylabel('accel Z (m.s-2)')
-
-
-
-
-time = np.linspace(0, 10, 7763)
-x = []
-y = []
-z = []
-
-for i in all_Pt_ancrage_collecte:
-    x.append(i[:, 0])
-    y.append(i[:, 1])
-    z.append(i[:, 2])
-
-fig, axes = plt.subplots(1, 3)
-fig.suptitle("Position des points d'ancrage captés")
-axes[0].plot(time, x)
-axes[0].set_xlabel("Temps (s)")
-axes[0].set_ylabel("X (m)")
-
-axes[1].plot(time, y)
-axes[1].set_xlabel("Temps (s)")
-axes[1].set_ylabel("Y (m)")
-
-axes[2].plot(time, z)
-axes[2].set_xlabel("Temps (s)")
-axes[2].set_ylabel("Z (m)")
+for i_marker in range(len(z)):
+    if z[i_marker].shape != (0, ):
+        ax[0].plot(time[:-1], z[i_marker])
+        ax[0].plot(time[:-1], z_filtered[i_marker], '-r')
+        ax[1].plot(time[1:-2], az[i_marker])
+fig.suptitle('Frame markers')
+ax[0].set_xlabel('Time [s]')
+ax[0].set_ylabel('Z [m]')
+ax[1].set_xlabel('Time [s]')
+ax[1].set_ylabel(r'Acceleration [$m/s^-2$]')
+plt.savefig("../Plots/frame_markers.png")
 plt.show()
 
+# TODO: Plot the forces from the model vs force plates
