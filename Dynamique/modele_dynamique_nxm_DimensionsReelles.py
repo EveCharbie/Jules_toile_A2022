@@ -10,24 +10,9 @@ import matplotlib.animation as animation
 import mpl_toolkits.mplot3d.axes3d as p3
 from ezc3d import c3d
 import seaborn as sns
-from scipy import signal
+import scipy
 from IPython import embed
 
-#####################################################################################################################
-# Le programme dynamics totalement simule fonctionne, mais on veut maintenant
-# mettre les vraies valeurs des parametres du trampo>
-# FAIT - ecart entre les points de la toile
-# - ecarts entre les points de la toile et ceux du cadre
-# - 8 points du maillage plus fin au centre
-# - vraies spring_lengths au repos
-# - vraies raideurs et spring_lengths au repos de la toile
-# - vraies raideurs et spring_lengths au repos des ressorts du cadre
-# - vraies masses en chaque point
-######################################################################################################################
-"""
-Ce programme calcule et affiche les positions des points de la toile de trampoline 
-On a utilisé les mêmes mesures que sur le trampo réel (positions des marqueurs)
-"""
 
 # ACTION :
 affichage = "subplot"  #'subplot' #'animation'
@@ -269,60 +254,60 @@ def Param():
     return k, k_oblique, M, C
 
 
-def Points_ancrage_fix(dict_fixed_params):
-    dL = dict_fixed_params["dL"]
-    dl = dict_fixed_params["dl"]
-    l_droite = dict_fixed_params["l_droite"]
-    l_gauche = dict_fixed_params["l_gauche"]
-    L_haut = dict_fixed_params["L_haut"]
-    L_bas = dict_fixed_params["L_bas"]
-
-    # repos :
-    Pos_repos = np.zeros((n * m, 3))
-
-    # on dit que le point numero 0 est a l'origine
-    for j in range(m):
-        for i in range(n):
-            # Pos_repos[i + j * n] = np.array([-np.sum(dl[:j + 1]), np.sum(dL[:i + 1]), 0])
-            Pos_repos[i + j * n, :] = np.array([-np.sum(dl[: j + 1]), np.sum(dL[: i + 1]), 0])
-
-    Pos_repos_new = np.zeros((n * m, 3))
-    for j in range(m):
-        for i in range(n):
-            Pos_repos_new[i + j * n, :] = Pos_repos[i + j * n, :] - Pos_repos[67, :]
-
-    # ancrage :
-    Pt_ancrage = np.zeros((2 * (n + m), 3))
-    # cote droit :
-    for i in range(n):
-        Pt_ancrage[i, 1:2] = Pos_repos_new[i, 1:2]
-        Pt_ancrage[i, 0] = l_droite
-    # cote haut : on fait un truc complique pour center autour de l'axe vertical
-    Pt_ancrage[n + 4, :] = np.array([0, L_haut, 0])
-    for j in range(n, n + 4):
-        Pt_ancrage[j, :] = np.array([0, L_haut, 0]) + np.array([np.sum(dl[1 + j - n : 5]), 0, 0])
-    for j in range(n + 5, n + m):
-        Pt_ancrage[j, :] = np.array([0, L_haut, 0]) - np.array([np.sum(dl[5 : j - n + 1]), 0, 0])
-    # cote gauche :
-    for k in range(n + m, 2 * n + m):
-        Pt_ancrage[k, 1:2] = -Pos_repos_new[k - n - m, 1:2]
-        Pt_ancrage[k, 0] = -l_gauche
-    # cote bas :
-    Pt_ancrage[2 * n + m + 4, :] = np.array([0, -L_bas, 0])
-
-    Pt_ancrage[2 * n + m, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:9]), 0, 0])
-    Pt_ancrage[2 * n + m + 1, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:8]), 0, 0])
-    Pt_ancrage[2 * n + m + 2, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:7]), 0, 0])
-    Pt_ancrage[2 * n + m + 3, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:6]), 0, 0])
-
-    Pt_ancrage[2 * n + m + 5, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[4:5]), 0, 0])
-    Pt_ancrage[2 * n + m + 6, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[3:5]), 0, 0])
-    Pt_ancrage[2 * n + m + 7, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[2:5]), 0, 0])
-    Pt_ancrage[2 * n + m + 8, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[1:5]), 0, 0])
-
-    Pt_ancrage, Pos_repos_new = rotation_points2(Pt_ancrage, Pos_repos_new)
-
-    return Pt_ancrage, Pos_repos_new
+# def Points_ancrage_fix(dict_fixed_params):
+#     dL = dict_fixed_params["dL"]
+#     dl = dict_fixed_params["dl"]
+#     l_droite = dict_fixed_params["l_droite"]
+#     l_gauche = dict_fixed_params["l_gauche"]
+#     L_haut = dict_fixed_params["L_haut"]
+#     L_bas = dict_fixed_params["L_bas"]
+#
+#     # repos :
+#     Pos_repos = np.zeros((n * m, 3))
+#
+#     # on dit que le point numero 0 est a l'origine
+#     for j in range(m):
+#         for i in range(n):
+#             # Pos_repos[i + j * n] = np.array([-np.sum(dl[:j + 1]), np.sum(dL[:i + 1]), 0])
+#             Pos_repos[i + j * n, :] = np.array([-np.sum(dl[: j + 1]), np.sum(dL[: i + 1]), 0])
+#
+#     Pos_repos_new = np.zeros((n * m, 3))
+#     for j in range(m):
+#         for i in range(n):
+#             Pos_repos_new[i + j * n, :] = Pos_repos[i + j * n, :] - Pos_repos[67, :]
+#
+#     # ancrage :
+#     Pt_ancrage = np.zeros((2 * (n + m), 3))
+#     # cote droit :
+#     for i in range(n):
+#         Pt_ancrage[i, 1:2] = Pos_repos_new[i, 1:2]
+#         Pt_ancrage[i, 0] = l_droite
+#     # cote haut : on fait un truc complique pour center autour de l'axe vertical
+#     Pt_ancrage[n + 4, :] = np.array([0, L_haut, 0])
+#     for j in range(n, n + 4):
+#         Pt_ancrage[j, :] = np.array([0, L_haut, 0]) + np.array([np.sum(dl[1 + j - n : 5]), 0, 0])
+#     for j in range(n + 5, n + m):
+#         Pt_ancrage[j, :] = np.array([0, L_haut, 0]) - np.array([np.sum(dl[5 : j - n + 1]), 0, 0])
+#     # cote gauche :
+#     for k in range(n + m, 2 * n + m):
+#         Pt_ancrage[k, 1:2] = -Pos_repos_new[k - n - m, 1:2]
+#         Pt_ancrage[k, 0] = -l_gauche
+#     # cote bas :
+#     Pt_ancrage[2 * n + m + 4, :] = np.array([0, -L_bas, 0])
+#
+#     Pt_ancrage[2 * n + m, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:9]), 0, 0])
+#     Pt_ancrage[2 * n + m + 1, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:8]), 0, 0])
+#     Pt_ancrage[2 * n + m + 2, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:7]), 0, 0])
+#     Pt_ancrage[2 * n + m + 3, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:6]), 0, 0])
+#
+#     Pt_ancrage[2 * n + m + 5, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[4:5]), 0, 0])
+#     Pt_ancrage[2 * n + m + 6, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[3:5]), 0, 0])
+#     Pt_ancrage[2 * n + m + 7, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[2:5]), 0, 0])
+#     Pt_ancrage[2 * n + m + 8, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[1:5]), 0, 0])
+#
+#     Pt_ancrage, Pos_repos_new = rotation_points2(Pt_ancrage, Pos_repos_new)
+#
+#     return Pt_ancrage, Pos_repos_new
 
 
 def Points_ancrage_repos(dict_fixed_params):
@@ -434,21 +419,21 @@ def Spring_bouts_repos(Pos_repos, Pt_ancrage, time, Nb_increments):
     return (Spring_bout_1, Spring_bout_2)
 
 
-def Spring_bouts_croix_repos(Pos_repos, time, Nb_increments):
+def Spring_bouts_cross_repos(Pos_repos):
     # RESSORTS OBLIQUES : il n'y en a pas entre le cadre et la toile
-    Spring_bout_croix_1 = np.zeros((Nb_increments, Nb_ressorts_croix, 3))
+    Spring_bout_croix_1 = np.zeros((Nb_ressorts_croix, 3))
 
     # Pour spring_bout_1 on prend uniquement les points de droite des ressorts obliques
     k = 0
     for i in range((m - 1) * n):
-        Spring_bout_croix_1[time, k, :] = Pos_repos[time, i, :]
+        Spring_bout_croix_1[k, :] = Pos_repos[i, :]
         k += 1
         # a part le premier et le dernier de chaque colonne, chaque point est relie a deux ressorts obliques
         if (i + 1) % n != 0 and i % n != 0:
-            Spring_bout_croix_1[time, k, :] = Pos_repos[time, i, :]
+            Spring_bout_croix_1[k, :] = Pos_repos[i, :]
             k += 1
 
-    Spring_bout_croix_2 = np.zeros((Nb_increments, Nb_ressorts_croix, 3))
+    Spring_bout_croix_2 = np.zeros((Nb_ressorts_croix, 3))
     # Pour spring_bout_2 on prend uniquement les points de gauche des ressorts obliques
     # pour chaue carre on commence par le point en haut a gauche, puis en bas a gauche
     # cetait un peu complique mais ca marche, faut pas le changer
@@ -456,87 +441,87 @@ def Spring_bouts_croix_repos(Pos_repos, time, Nb_increments):
     k = 0
     while j < m:
         for i in range(j * n, (j + 1) * n - 2, 2):
-            Spring_bout_croix_2[time, k, :] = Pos_repos[time, i + 1, :]
-            Spring_bout_croix_2[time, k + 1, :] = Pos_repos[time, i, :]
-            Spring_bout_croix_2[time, k + 2, :] = Pos_repos[time, i + 2, :]
-            Spring_bout_croix_2[time, k + 3, :] = Pos_repos[time, i + 1, :]
+            Spring_bout_croix_2[k, :] = Pos_repos[i + 1, :]
+            Spring_bout_croix_2[k + 1, :] = Pos_repos[i, :]
+            Spring_bout_croix_2[k + 2, :] = Pos_repos[i + 2, :]
+            Spring_bout_croix_2[k + 3, :] = Pos_repos[i + 1, :]
             k += 4
         j += 1
 
     return Spring_bout_croix_1, Spring_bout_croix_2
 
 
-def Spring_bouts(Pt, Pt_ancrage, time, Nb_increments):
+def Spring_bouts(Pt, Pt_ancrage):
     # Definition des ressorts (position, taille)
-    Spring_bout_1 = np.zeros((Nb_increments, Nb_ressorts, 3))
+    Spring_bout_1 = np.zeros((Nb_ressorts, 3))
 
     # RESSORTS ENTRE LE CADRE ET LA TOILE
     for i in range(0, Nb_ressorts_cadre):
-        Spring_bout_1[time, i, :] = Pt_ancrage[i, :]
+        Spring_bout_1[i, :] = Pt_ancrage[i, :]
 
     # RESSORTS HORIZONTAUX : il y en a n*(m-1)
     for i in range(Nb_ressorts_horz):
-        Spring_bout_1[time, Nb_ressorts_cadre + i, :] = Pt[i, :]
+        Spring_bout_1[Nb_ressorts_cadre + i, :] = Pt[i, :]
 
     # RESSORTS VERTICAUX : il y en a m*(n-1)
     k = 0
     for i in range(n - 1):
         for j in range(m):
-            Spring_bout_1[time, Nb_ressorts_cadre + Nb_ressorts_horz + k, :] = Pt[i + n * j, :]
+            Spring_bout_1[Nb_ressorts_cadre + Nb_ressorts_horz + k, :] = Pt[i + n * j, :]
             k += 1
     ####################################################################################################################
-    Spring_bout_2 = np.zeros((Nb_increments, Nb_ressorts, 3))
+    Spring_bout_2 = np.zeros((Nb_ressorts, 3))
 
     # RESSORTS ENTRE LE CADRE ET LA TOILE
     for i in range(0, n):  # points droite du bord de la toile
-        Spring_bout_2[time, i, :] = Pt[i, :]
+        Spring_bout_2[i, :] = Pt[i, :]
 
     k = 0
     for i in range(n - 1, m * n, n):  # points hauts du bord de la toile
-        Spring_bout_2[time, n + k, :] = Pt[i, :]
+        Spring_bout_2[n + k, :] = Pt[i, :]
         k += 1
 
     k = 0
     for i in range(m * n - 1, n * (m - 1) - 1, -1):  # points gauche du bord de la toile
-        Spring_bout_2[time, n + m + k, :] = Pt[i, :]
+        Spring_bout_2[n + m + k, :] = Pt[i, :]
         k += 1
 
     k = 0
     for i in range(n * (m - 1), -1, -n):  # points bas du bord de la toile
-        Spring_bout_2[time, 2 * n + m + k, :] = Pt[i, :]
+        Spring_bout_2[2 * n + m + k, :] = Pt[i, :]
         k += 1
 
     # RESSORTS HORIZONTAUX : il y en a n*(m-1)
     k = 0
     for i in range(n, n * m):
-        Spring_bout_2[time, Nb_ressorts_cadre + k, :] = Pt[i, :]
+        Spring_bout_2[Nb_ressorts_cadre + k, :] = Pt[i, :]
         k += 1
 
     # RESSORTS VERTICAUX : il y en a m*(n-1)
     k = 0
     for i in range(1, n):
         for j in range(m):
-            Spring_bout_2[time, Nb_ressorts_cadre + Nb_ressorts_horz + k, :] = Pt[i + n * j, :]
+            Spring_bout_2[Nb_ressorts_cadre + Nb_ressorts_horz + k, :] = Pt[i + n * j, :]
             k += 1
 
     return Spring_bout_1, Spring_bout_2
 
 
-def Spring_bouts_croix(Pt, time, Nb_increments):
+def Spring_bouts_cross(Pt):
     # RESSORTS OBLIQUES : il n'y en a pas entre le cadre et la toile
-    Spring_bout_croix_1 = np.zeros((Nb_increments, Nb_ressorts_croix, 3))
+    Spring_bout_croix_1 = np.zeros((Nb_ressorts_croix, 3))
 
     # Pour spring_bout_1 on prend uniquement les points de droite des ressorts obliques
     k = 0
     for i in range((m - 1) * n):
-        Spring_bout_croix_1[time, k, :] = Pt[i, :]
+        Spring_bout_croix_1[k, :] = Pt[i, :]
         k += 1
         # a part le premier et le dernier de chaque colonne, chaque point est relie a deux ressorts obliques
         if (i + 1) % n != 0 and i % n != 0:
-            Spring_bout_croix_1[time, k, :] = Pt[i, :]
+            Spring_bout_croix_1[k, :] = Pt[i, :]
             k += 1
 
-    Spring_bout_croix_2 = np.zeros((Nb_increments, Nb_ressorts_croix, 3))
+    Spring_bout_croix_2 = np.zeros((Nb_ressorts_croix, 3))
     # Pour spring_bout_2 on prend uniquement les points de gauche des ressorts obliques
     # pour chaue carre on commence par le point en haut a gauche, puis en bas a gauche
     # cetait un peu complique mais ca marche, faut pas le changer
@@ -544,10 +529,10 @@ def Spring_bouts_croix(Pt, time, Nb_increments):
     k = 0
     while j < m:
         for i in range(j * n, (j + 1) * n - 2, 2):
-            Spring_bout_croix_2[time, k, :] = Pt[i + 1, :]
-            Spring_bout_croix_2[time, k + 1, :] = Pt[i, :]
-            Spring_bout_croix_2[time, k + 2, :] = Pt[i + 2, :]
-            Spring_bout_croix_2[time, k + 3, :] = Pt[i + 1, :]
+            Spring_bout_croix_2[k, :] = Pt[i + 1, :]
+            Spring_bout_croix_2[k + 1, :] = Pt[i, :]
+            Spring_bout_croix_2[k + 2, :] = Pt[i + 2, :]
+            Spring_bout_croix_2[k + 3, :] = Pt[i + 1, :]
             k += 4
         j += 1
 
@@ -582,41 +567,41 @@ def rotation_points(Pt_ancrage, Pos_repos):
 
     return Pt_ancrage_new, Pos_repos_new
 
+#
+# def rotation_points2(Pt_ancrage, Pos_repos):
+#     """
+#     Appliquer la rotation pour avoir la même orientation que les points de la collecte
+#     :param Pos_repos: cas.DM(n*m,3): coordonnées (2D) des points de la toile
+#     :param Pt_ancrage: cas.DM(2*n+2*m,3): coordonnées des points du cadre
+#     :return: Pos_repos, Pt_ancrage
+#     """
+#
+#     mat_base_collecte = np.array(
+#         [
+#             [0.99964304, -0.02650231, 0.00338079],
+#             [0.02650787, 0.99964731, -0.00160831],
+#             [-0.00333697, 0.00169736, 0.99999299],
+#         ]
+#     )
+#     # calcul inverse
+#     # mat_base_inv_np = np.linalg.inv(mat_base_collecte)
+#     mat_base_inv_np = mat_base_collecte
+#
+#     Pt_ancrage_new = np.zeros((Nb_ressorts_cadre, 3))
+#     for index in range(Nb_ressorts_cadre):
+#         Pt_ancrage_new[index, :] = np.matmul(
+#             Pt_ancrage[index, :], mat_base_inv_np
+#         )  # multplication de matrices en casadi
+#
+#     Pos_repos_new = np.zeros((n * m, 3))
+#     for index in range(n * m):
+#         Pos_repos_new[index, :] = np.matmul(Pos_repos[index, :], mat_base_inv_np)
+#
+#     return Pt_ancrage_new, Pos_repos_new
 
-def rotation_points2(Pt_ancrage, Pos_repos):
-    """
-    Appliquer la rotation pour avoir la même orientation que les points de la collecte
-    :param Pos_repos: cas.DM(n*m,3): coordonnées (2D) des points de la toile
-    :param Pt_ancrage: cas.DM(2*n+2*m,3): coordonnées des points du cadre
-    :return: Pos_repos, Pt_ancrage
-    """
 
-    mat_base_collecte = np.array(
-        [
-            [0.99964304, -0.02650231, 0.00338079],
-            [0.02650787, 0.99964731, -0.00160831],
-            [-0.00333697, 0.00169736, 0.99999299],
-        ]
-    )
-    # calcul inverse
-    # mat_base_inv_np = np.linalg.inv(mat_base_collecte)
-    mat_base_inv_np = mat_base_collecte
-
-    Pt_ancrage_new = np.zeros((Nb_ressorts_cadre, 3))
-    for index in range(Nb_ressorts_cadre):
-        Pt_ancrage_new[index, :] = np.matmul(
-            Pt_ancrage[index, :], mat_base_inv_np
-        )  # multplication de matrices en casadi
-
-    Pos_repos_new = np.zeros((n * m, 3))
-    for index in range(n * m):
-        Pos_repos_new[index, :] = np.matmul(Pos_repos[index, :], mat_base_inv_np)
-
-    return Pt_ancrage_new, Pos_repos_new
-
-
-def Force_calc(
-    Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2, Masse_centre, time, Nb_increments
+def static_forces_calc(
+    Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2
 ):  # force en chaque ressort
     k, k_oblique, M, C = Param()
     l_repos = dict_fixed_params["l_repos"]
@@ -658,10 +643,10 @@ def Force_calc(
     return M, F_spring, F_spring_croix, F_masses
 
 
-def Force_point(
-    F_spring, F_spring_croix, F_masses, time, Nb_increments
-):  # --> resultante des forces en chaque point a un instant donne
-    # forces elastiques
+def static_force_in_each_point(F_spring, F_spring_croix, F_masses):  
+    """
+    Computes the static resulting force in each point (elastic force + weight).
+    """
     F_spring_points = np.zeros((n * m, 3))
 
     # - points des coin de la toile : VERIFIE CEST OK
@@ -1084,94 +1069,133 @@ def Resultat_PF_collecte(participant, static_trial_name, empty_trial_name, trial
 
 def Point_ancrage(Point_collecte, labels):
     """
-    :param Point_collecte: ensemble des points de collecte de l'intervalle dynamics
-    :param labels: labels des points
-    :return:
-    ensemble des coordonnées des points d'ancrage a chaque frame (point du cadre avec label C) sous forme de tableaux
+    Reorder the marker coordinates to match the position they should occupy in the model (only the "C" markers are considered).
     """
-    point_ancrage = []
+    point_ancrage = np.zeros((len(Point_collecte), 3, 2*(n+m)))
+    point_ancrage[:, :, :] = np.nan
     label_ancrage = []
     for frame in range(len(Point_collecte)):
-        pt_ancrage_frame = []
         for idx, lab in enumerate(labels):
             if "C" in lab:
-                pt_ancrage_frame.append(Point_collecte[frame][:, idx])
-
-                if frame == 0:
-                    label_ancrage.append(lab)
-        point_ancrage.append(pt_ancrage_frame)
-
-    # transformation des elements en array
-    liste_point_ancrage = []
-    for list_point in point_ancrage:
-        tab_point = np.array((list_point[0]))
-        for ligne in range(1, len(list_point)):
-            tab_point = np.vstack((tab_point, list_point[ligne]))
-        liste_point_ancrage.append(tab_point)
+                point_ancrage[frame, :, int(lab[1:])] = Point_collecte[frame][:, idx]
+            if lab not in label_ancrage:
+                label_ancrage.append(lab)
+    #
+    # # transformation des elements en array
+    # liste_point_ancrage = []
+    # for list_point in point_ancrage:
+    #     tab_point = np.array((list_point[0]))
+    #     for ligne in range(1, len(list_point)):
+    #         tab_point = np.vstack((tab_point, list_point[ligne]))
+    #     liste_point_ancrage.append(tab_point)
 
     # for point_anc in liste_point_ancrage:
     #     point_anc = rotation_points(point_anc)
 
-    return liste_point_ancrage, label_ancrage
+    return point_ancrage, label_ancrage
 
 
 def Point_toile_init(Point_collecte, labels):
     """
-    :param Point_collecte: ensemble des points de collecte de l'intervalle dynamics
-    :param labels: labels des points
-    :return:
-    ensemble des coordonnées des points a chaque frame
+    Reorder the marker coordinates to match the position they should occupy in the model (only the "t" markers are considered).
     """
-    point_toile = []
+    point_toile = np.zeros((len(Point_collecte), 3, 135))
+    point_toile[:, :, :] = np.nan
+    label_toile = []
     for frame in range(len(Point_collecte)):
-        pt_toile_frame = []
         for idx, lab in enumerate(labels):
-            if "M" in lab or "t" in lab:
-                pt_toile_frame.append(Point_collecte[frame][:, idx])
-        point_toile.append(pt_toile_frame)
+            if "t" in lab:
+                point_toile[frame, :, int(lab[1:])] = Point_collecte[frame][:, idx]
+            if lab not in label_toile:
+                label_toile.append(lab)
 
-    # transformation des elements en array
-    liste_point_toile = []
-    for list_point in point_toile:
-        tab_point = np.array((list_point[0]))
-        for ligne in range(1, len(list_point)):
-            tab_point = np.vstack((tab_point, list_point[ligne]))
+    # # transformation des elements en array
+    # liste_point_toile = []
+    # for list_point in point_toile:
+    #     tab_point = np.array((list_point[0]))
+    #     for ligne in range(1, len(list_point)):
+    #         tab_point = np.vstack((tab_point, list_point[ligne]))
         liste_point_toile.append(tab_point)
 
-    return liste_point_toile
+    return point_toile, label_toile
 
 
-def interpolation_collecte(Pt_collecte, labels):
+def interpolation_collecte(Pt_collecte_tab, Pt_ancrage, labels):
     """
-    Interpoler lespoints manquants de la collecte pour les utiliser dans l'initial guess
-    :param Pt_collecte: DM(3,135)
-    :param labels: list(nombre de labels)
-    :return: Pt_interpole: DM(3,135) (même dimension que Pos_repos)
+    Interpolate to fill the missing markers.
     """
-    # liste avec les bons points aux bons endroits, et le reste vaut 0
-    Pt_interpole = np.zeros((3, 135))
-    Pt_interpole[:] = np.nan
-    for ind in range(135):
-        if "t" + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index("t" + str(ind))]) == False:
-            Pt_interpole[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]
 
-    return Pt_interpole
+    Pt_interpolated = np.zeros((len(Pt_collecte_tab), 135, 3))
+    Pt_needs_interpolation = np.ones((len(Pt_collecte_tab), 135, 3))
+    for frame in range(len(Pt_collecte_tab)):
+
+        fig = plt.figure(1)
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_box_aspect([1.1, 1.8, 1])
+
+        # Fill markers data that we have
+        for ind in range(135):
+            if "t" + str(ind) in labels and np.isnan(Pt_collecte_tab[frame][0, labels.index("t" + str(ind))]) == False:
+                Pt_interpolated[frame, ind, :] = Pt_collecte_tab[frame][:, labels.index("t" + str(ind))]
+                Pt_needs_interpolation[frame, ind, :] = 0
+                ax.plot(Pt_interpolated[frame, ind, 0], Pt_interpolated[frame, ind, 1], Pt_interpolated[frame, ind, 2], '.b')
+
+        # séparation des colonnes
+        Pt_colonnes = []
+        for i in range(9):
+            Pt_colonnei = np.zeros((3, 17))
+            Pt_colonnei[:, 0] = Pt_ancrage[frame][2 * (n + m) - 1 - i, :]
+            Pt_colonnei[:, 1:16] = Pt_interpolated[frame, :, 15 * i : 15 * (i + 1)]
+            Pt_colonnei[:, -1] = Pt_ancrage[frame][n + i, :]
+            Pt_colonnes += [Pt_colonnei]
+            ax.plot(Pt_colonnei[0, :], Pt_colonnei[1, :], Pt_colonnei[2, :], '-r', label="Columns")
+
+        # # interpolation des points de chaque colonne
+        # Pt_inter_liste = []
+        # for colonne in range(9):
+        #     for ind in range(17):
+        #         if Pt_colonnes[colonne][0, ind] == 0:
+        #             gauche = Pt_colonnes[colonne][:, ind - 1]
+        #             j = 1
+        #             while Pt_colonnes[colonne][0, ind + j] == 0:
+        #                 j += 1
+        #             droite = Pt_colonnes[colonne][:, ind + j]
+        #             Pt_colonnes[colonne][:, ind] = gauche + (droite - gauche) / (j + 1)
+        #     Pt_inter_liste += [Pt_colonnes[colonne][:, 1:16]]
+        #     ax.plot(Pt_colonnei[0, :], Pt_colonnei[1, :], Pt_colonnei[2, :], '-m', label="Rows")
 
 
-def Bouts_ressort_collecte(Pt_interpolés, nb_frame):
+        from geomdl import fitting
+        # Create a 3D surface with the markers we have
+        surface_fit = fitting.approximate_surface(Pt_interpolated[Pt_needs_interpolation[frame, :, :], :, 0],
+                                                  Pt_interpolated[Pt_needs_interpolation[frame, :, :], :, 1],
+                                                  Pt_interpolated[Pt_needs_interpolation[frame, :, :], :, 2],
+                                                  degree_u=3, degree_v=3)
+        for ind in range(135):
+            if Pt_needs_interpolation[frame, ind, :] == 1:
+                Pt_interpolated[frame, ind, 2] = surface_fit(x, y)
+
+        # on recolle les colonnes interpolées
+        Pt_inter = []
+        for i in range(9):
+            Pt_inter = np.vstack((Pt_inter, Pt_inter_liste[i]))
+
+        Pt_interpolated[frame, :, :] = Pt_inter
+
+        ax.plot(Pt_interpolated[frame, ind, 0], Pt_interpolated[frame, ind, 1], Pt_interpolated[frame, ind, 2], '.b', label="Markers")
+        ax.legend()
+        plt.savefig("Plots/interpolaion_frame_" + str(frame) + ".png")
+        plt.show()
+
+    return Pt_inter
+
+def spring_bouts_collecte(Pt_interpolated):
     """
-    :param Pt_interpolés: point collecte
-    :param nb_frame: nombre de frame dans l'intervalle dynamics
-
-    :return: bouts des ressorts, coordonnées
+    Returns the coordinates of the spring ends from the markers coordinates (linking the right markers together).
     """
-    frame = 0
-    Spring_bouts1, Spring_bouts2 = Spring_bouts(Pt_interpolés.T, Pt_ancrage_repos, frame, nb_frame)
-    Spring_bouts1, Spring_bouts2 = Spring_bouts1[0], Spring_bouts2[0]
-    Spring_bouts_croix1, Spring_bouts_croix2 = Spring_bouts_croix(Pt_interpolés.T, frame, nb_frame)
-    Spring_bouts_croix1, Spring_bouts_croix2 = Spring_bouts_croix1[0], Spring_bouts_croix2[0]
-
-    return Spring_bouts1, Spring_bouts2, Spring_bouts_croix1, Spring_bouts_croix2
+    Spring_bouts1, Spring_bouts2 = Spring_bouts(Pt_interpolated.T, Pt_ancrage_repos)
+    Spring_bouts_cross1, Spring_bouts_cross2 = Spring_bouts_cross(Pt_interpolated.T)
+    return Spring_bouts1, Spring_bouts2, Spring_bouts_cross1, Spring_bouts_cross2
 
 
 def Affichage_points_collecte_t(Pt_toile, Pt_ancrage, Ressort, nb_frame, ind_masse):
@@ -1182,7 +1206,7 @@ def Affichage_points_collecte_t(Pt_toile, Pt_ancrage, Ressort, nb_frame, ind_mas
     :param ressort: Booleen, if true on affiche les ressorts
 
     """
-    bout1, bout2, boutc1, boutc2 = Bouts_ressort_collecte(Pt_toile, nb_frame)
+    bout1, bout2, boutc1, boutc2 = spring_bouts_collecte(Pt_toile)
 
     fig = plt.figure(0)
     ax = fig.add_subplot(111, projection="3d")
@@ -1236,28 +1260,20 @@ def Affichage_points_collecte_t(Pt_toile, Pt_ancrage, Ressort, nb_frame, ind_mas
     return ax
 
 
-def Etat_initial(Ptavant, Ptapres, labels):
+def velocity_from_finite_difference(Pt_before, Pt_after, labels):
     """
-    :param Pt intervalle dynamics
-    :param labels
-    :return:
-    vitesse initiale a l'instant -1, de la frame 0 de l'intervalle dynamics
+    Approximates the velocity of the markers using the finite difference method.
     """
-
-    position_imoins1 = interpolation_collecte(Ptavant, labels)
-    position_iplus1 = interpolation_collecte(Ptapres, labels)
-    distance_xyz = np.abs(position_imoins1 - position_iplus1)
-    vitesse_initiale = distance_xyz / (2 * 0.002)
-
-    return vitesse_initiale
+    position_imoins1 = interpolation_collecte(Pt_before, labels)
+    position_iplus1 = interpolation_collecte(Pt_after, labels)
+    distance_xyz = position_iplus1 - position_imoins1
+    approx_velocity = distance_xyz / (2 * 0.002)
+    return approx_velocity
 
 
-def erreurs(Pt_intergres, Pt_frame2):
+def integration_error(Pt_intergres, Pt_frame2):
     """
-    :param Pt_intergres: calcule par intergration
-    :param Pt_frame2: points a l'instant i+1
-    :return:
-    erreur absolue et erreur relative de la différence des positions des points
+    Computes the error between the point positions computed from integration and the actual markers
     """
 
     position_iplus1 = interpolation_collecte(Pt_frame2, labels)
@@ -1284,14 +1300,9 @@ def update(time, Pt_integrated, Pt_markers, integrated_point, markers_point):
 
     return
 
-def Integration(nb_frame, Pt_collecte_tab, labels, Masse_centre):
+def multiple_shooting_euler_integration(nb_frame, Pt_interpoles, labels):
     """
-
-    :param nb_frame:
-    :param Pt_collecte_tab:
-    :param labels:
-    :param Masse_centre:
-    :return:
+    Computes the position of the points by integrating (from the forces and initial conditions)
     -------
     -position des points integres
     -forces calculées a chaque frame en chaque point
@@ -1299,57 +1310,201 @@ def Integration(nb_frame, Pt_collecte_tab, labels, Masse_centre):
     -erreurs de position absolues entre points integres et points collectes
     """
 
-    # ---initialisation---#
-    Pt_integ = np.zeros((n * m, 3))
-    vitesse_calc = np.zeros((n * m, 3))
-    accel_calc = np.zeros((n * m, 3))
-
+    # --- Initzalization ---#
     Pt_tot = np.zeros((nb_frame, n * m, 3))
     F_all_point = np.zeros((nb_frame, n * m, 3))
-    v_all = np.zeros((nb_frame, n * m, 3))
+    Velocity_tot = np.zeros((nb_frame, n * m, 3))
+    relative_error, absolute_error = [], []
 
-    erreur_relative, erreur_absolue = [], []
+    # Velocity of the second frame by finite difference
+    current_velocity = velocity_from_finite_difference(Pt_interpoles[0], Pt_interpoles[2], labels)
+    Velocity_tot[0, :, :] = current_velocity.T
 
-    for frame in range(1, nb_frame - 1):
-        # initialisation
-        Pt_integ = np.zeros((n * m, 3))
-        vitesse_calc = np.zeros((n * m, 3))
-        accel_calc = np.zeros((n * m, 3))
+    Pt_tot[0, :, :] = interpolation_collecte(Pt_interpoles[0], labels).T
 
-        # ---A l'etat initial t---#
-        Pt_interpolés = interpolation_collecte(Pt_collecte_tab[frame], labels)
-        bt1, bt2, btc1, btc2 = Bouts_ressort_collecte(Pt_interpolés, nb_frame)
-        # affichage
-        # ax = Affichage_points_collecte_t(Pt_interpolés, Pt_ancrage, False , bt1, bt2, btc1, btc2, ind_masse)
+    for frame in range(nb_frame - 1):
 
-        vitesse_avant = Etat_initial(Pt_collecte_tab[frame - 1], Pt_collecte_tab[frame + 1], labels)
-        v_all[frame, :, :] = vitesse_avant.T
+        # --- At the current frame ---#
+        Pt_interpolated = interpolation_collecte(Pt_interpoles[frame], labels)
+        bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt_interpolated)
 
-        # maintenant qu'on a tous les parametres, on peut passer a l'estimation des positions a l'instant 1 en integrant les donnees de l'etat initial 0
-        # Integration de l'etat initial
-        M, F_spring, F_spring_croix, F_masses = Force_calc(bt1, bt2, btc1, btc2, Masse_centre, 0, nb_frame)
-        F_point = Force_point(
-            F_spring, F_spring_croix, F_masses, 0, nb_frame
-        )  # comprend la force des ressorts et le poids
+        # Computation the forces based on the state of the model
+        M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
+        F_point = static_force_in_each_point(F_spring, F_spring_croix, F_masses)
 
         F_all_point[frame, :, :] = F_point
 
+        accel_current = np.zeros((n * m, 3))
+        velocity_next = np.zeros((n * m, 3))
+        Pt_integ = np.zeros((n * m, 3))
         for i in range(0, n * m):
-            # acceleration
-            accel_calc[i, :] = F_point[i, :] / M[i]
-            # vitesse
-            vitesse_calc[i, :] = dt * accel_calc[i, :] + vitesse_avant.T[i, :]
-            # position
-            Pt_integ[i, :] = dt * vitesse_calc[i, :] + Pt_interpolés.T[i, :]
+            accel_current[i, :] = F_point[i, :] / M[i]
+            velocity_next[i, :] = dt * accel_current[i, :] + current_velocity[i, :]
+            Pt_integ[i, :] = dt * Velocity_tot[frame, i, :] + Pt_interpolated.T[i, :]
 
-        Pt_tot[frame - 1, :, :] = Pt_integ
+        # Make sure the intial velocity approximation does not have too much of an effect on the integration
+        # by regularizing with the finite difference velocity
+        if frame == 1:
+            velocity_next = (initial_velocity + velocity_next) / 2
 
-        # ---erreurs---#
+        Pt_tot[frame+1, :, :] = Pt_integ
+        Velocity_tot[frame+1, :, :] = velocity_next
 
-        erreur_relative.append(erreurs(Pt_integ, Pt_collecte_tab[frame + 1])[0])
-        erreur_absolue.append(erreurs(Pt_integ, Pt_collecte_tab[frame + 1])[1])
+        # --- Errors ---#
+        relative_error.append(integration_error(Pt_integ, Pt_interpoles[frame + 1])[0])
+        absolute_error.append(integration_error(Pt_integ, Pt_interpoles[frame + 1])[1])
+
+    return Pt_tot, Velocity_tot, erreur_relative, erreur_absolue, F_all_point
+
+
+def single_shooting_euler_integration(nb_frame, Pt_interpoles, labels):
+    """
+    Computes the position of the points by integrating (from the forces and initial conditions)
+    -------
+    -position des points integres
+    -forces calculées a chaque frame en chaque point
+    -erreurs de position relative entre points integres et points collectes
+    -erreurs de position absolues entre points integres et points collectes
+    """
+
+    # --- Initzalization ---#
+    Pt_tot = np.zeros((nb_frame, n * m, 3))
+    F_all_point = np.zeros((nb_frame, n * m, 3))
+    Velocity_tot = np.zeros((nb_frame, n * m, 3))
+    relative_error, absolute_error = [], []
+
+    # Velocity of the second frame by finite difference
+    initial_velocity = velocity_from_finite_difference(Pt_interpoles[0], Pt_interpoles[2], labels)
+    Velocity_tot[0, :, :] = initial_velocity.T
+
+    Pt_interpolated = interpolation_collecte(Pt_interpoles[0], labels)
+    Pt_tot[0, :, :] = Pt_interpolated.T
+
+    for frame in range(nb_frame - 1):
+
+        # --- At the current frame ---#
+        bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt_tot[frame])
+
+        # Computation the forces based on the state of the model
+        M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
+        F_point = static_force_in_each_point(F_spring, F_spring_croix, F_masses)
+
+        F_all_point[frame, :, :] = F_point
+
+        accel_current = np.zeros((n * m, 3))
+        velocity_next = np.zeros((n * m, 3))
+        Pt_integ = np.zeros((n * m, 3))
+        for i in range(0, n * m):
+            accel_current[i, :] = F_point[i, :] / M[i]
+            velocity_next[i, :] = dt * accel_current[i, :] + Velocity_tot[frame, i, :]
+            Pt_integ[i, :] = dt * velocity_next[i, :] + Pt_tot.T[frame, i, :]
+
+        # Make sure the intial velocity approximation does not have too much of an effect on the integration
+        # by regularizing with the finite difference velocity
+        if frame == 1:
+            velocity_next = (initial_velocity + velocity_next) / 2
+
+        Pt_tot[frame+1, :, :] = Pt_integ
+        Velocity_tot[frame+1, :, :] = velocity_next
+
+        # --- Errors ---#
+        relative_error.append(integration_error(Pt_integ, Pt_interpoles[frame + 1])[0])
+        absolute_error.append(integration_error(Pt_integ, Pt_interpoles[frame + 1])[1])
 
     return Pt_tot, erreur_relative, erreur_absolue, F_all_point, v_all
+
+
+def multiple_shooting_integration(nb_frame, Pt_interpoles, labels):
+    """
+    Computes the position of the points by integrating (from the forces and initial conditions).
+    """
+    # def dyn_fun(t, Pt):
+    #     bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt)
+    #     M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
+    #     F_point = static_force_in_each_point(F_spring, F_spring_croix, F_masses)
+    #     accel_current = np.zeros((n * m, 3))
+    #     for i in range(0, n * m):
+    #         accel_current[i, :] = F_point[i, :] / M[i]
+    #     return accel_current
+    #
+    # solver = scipy.integrate.ode(fun)
+    # solver.set_integrator('dop853')
+
+    def dyn_fun(x, t):
+        """
+        x = [p, v]
+        dx = [v, dv]
+        """
+        p = x[:135*3].reshape(135, 3)
+        v = x[135*3:].reshape(135, 3)
+
+        bt1, bt2, btc1, btc2 = spring_bouts_collecte(p.T)
+        M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
+        F_point = static_force_in_each_point(F_spring, F_spring_croix, F_masses)
+        accel_current = np.zeros((n * m, 3))
+        for i in range(0, n * m):
+            accel_current[i, :] = F_point[i, :] / M[i]
+
+        return np.hstack((v.flatten(), accel_current.flatten()))
+
+    # --- Initzalization ---#
+    Pt_tot = np.zeros((nb_frame, n * m, 3))
+    F_all_point = np.zeros((nb_frame, n * m, 3))
+    Velocity_tot = np.zeros((nb_frame, n * m, 3))
+    relative_error, absolute_error = [], []
+
+    # Velocity of the second frame by finite difference
+    current_velocity = velocity_from_finite_difference(Pt_interpoles[0], Pt_interpoles[2], labels)
+    Velocity_tot[0, :, :] = current_velocity.T
+
+    Pt_interpolated = np.zeros((nb_frame, n * m, 3))
+    for frame in range(nb_frame):
+        Pt_interpolated[frame, :, :] = interpolation_collecte(Pt_interpoles[frame], labels).T
+    Pt_tot[0, :, :] = interpolation_collecte(Pt_interpoles[0], labels).T
+
+    for frame in range(nb_frame - 1):
+
+        # --- At the current frame ---#
+        if frame == 0:
+            current_velocity = velocity_from_finite_difference(Pt_interpoles[frame], Pt_interpoles[frame+1], labels) * dt
+        else:
+            current_velocity = velocity_from_finite_difference(Pt_interpoles[frame - 1], Pt_interpoles[frame + 1],
+                                                               labels)
+        Velocity_tot[frame, :, :] = current_velocity.T
+
+        # Computation the forces based on the state of the model
+        # M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
+        # F_point = static_force_in_each_point(F_spring, F_spring_croix, F_masses)
+        # F_all_point[frame, :, :] = F_point
+        # solver.set_initial_value(Pt_interpolated.T, 0)
+        # velocity_diff = solver.y
+        # Flatten array in the following order:
+        # Pt_interpolated.T[24, :] = Pt_interpolated.T.flatten()[24*3:25*3]
+        # Velocity_tot[frame, :, :][24, :] = Velocity_tot[frame, :, :].flatten()[24 * 3:25 * 3]
+
+        y0 = np.hstack((Pt_interpolated[frame, :, :].T.flatten(), Velocity_tot[frame, :, :].flatten()))
+        sol = scipy.integrate.solve_ivp(dyn_fun,
+                                        t_span=[0, dt],
+                                        y0=y0,
+                                        method="DOP853")
+        position_diff = sol[0]
+        velocity_diff = sol[1]
+        velocity_next = current_velocity + velocity_diff
+        Pt_integ = Pt_interpolated.T + position_diff
+
+        # Make sure the intial velocity approximation does not have too much of an effect on the integration
+        # by regularizing with the finite difference velocity
+        if frame == 1:
+            velocity_next = (initial_velocity + velocity_next) / 2
+
+        Pt_tot[frame + 1, :, :] = Pt_integ
+        Velocity_tot[frame + 1, :, :] = velocity_next
+
+        # --- Errors ---#
+        relative_error.append(integration_error(Pt_integ, Pt_interpoles[frame + 1])[0])
+        absolute_error.append(integration_error(Pt_integ, Pt_interpoles[frame + 1])[1])
+
+    return Pt_tot, Velocity_tot, erreur_relative, erreur_absolue, F_all_point
 
 
 def Animation(Pt_integres, Pt_collecte_tab, jump_frame_index_interval):
@@ -1412,16 +1567,13 @@ F_totale_collecte, Pt_collecte_tab, labels, ind_masse = Resultat_PF_collecte(
 k, k_oblique, M, C = Param()
 Pt_ancrage_repos, pos_repos = Points_ancrage_repos(dict_fixed_params)
 
-Pt_interpoles = interpolation_collecte(Pt_collecte_tab[0], labels)
-
-Pt_integres, erreur_relative, erreur_absolue, force_points, v_all = Integration(nb_frame, Pt_collecte_tab, labels, Masse_centre)
-
 Pt_ancrage_collecte, labels_ancrage = Point_ancrage(Pt_collecte_tab, labels)
-Pt_toile_collecte = Point_toile_init(Pt_collecte_tab, labels)
+Pt_toile_collecte, label_toile = Point_toile_init(Pt_collecte_tab, labels)
 
-Pt_ancrage_collecte = Pt_ancrage_collecte[0]
-Pt_toile_collecte = Pt_toile_collecte[0].T
+Pt_interpoles = interpolation_collecte(Pt_collecte_tab, Pt_ancrage_collecte, labels)
 
+# Pt_integres, erreur_relative, erreur_absolue, static_force_in_each_points, v_all = multiple_shooting_euler_integration(nb_frame, Pt_interpoles, labels, Masse_centre)
+Pt_integres, erreur_relative, erreur_absolue, static_force_in_each_points, v_all = multiple_shooting_integration(nb_frame, Pt_interpoles, labels)
 
 # Plot the position of the markers vs model points at the initial instant
 fig = plt.figure(0)
@@ -1441,8 +1593,8 @@ ax.legend()
 plt.show()
 
 
-# # Animation of the markers vs integrated marker position
-# Animation(Pt_integres, Pt_collecte_tab, jump_frame_index_interval)
+# Animation of the markers vs integrated marker position
+Animation(Pt_integres, Pt_collecte_tab, jump_frame_index_interval)
 
 
 # Plot the model and springs at the initial instant
@@ -1477,8 +1629,8 @@ for i_marker in range(all_Pt_ancrage_collecte[0].shape[0]):
     z[i_marker] = z[i_marker][1:]
     times_without_nans[i_marker] = times_without_nans[i_marker][1:]
 
-    a, b = signal.butter(4, 0.015)
-    z_filtered[i_marker] = signal.filtfilt(a, b, z[i_marker], method="gust")
+    a, b = scipy.signal.butter(4, 0.015)
+    z_filtered[i_marker] = scipy.signal.filtfilt(a, b, z[i_marker], method="gust")
     az[i_marker] = ((z_filtered[i_marker][2:]+z_filtered[i_marker][:-2]-2*z_filtered[i_marker][1:-1])/(dt*dt))
 
 
@@ -1497,3 +1649,4 @@ plt.savefig("../Plots/frame_markers.png")
 plt.show()
 
 # TODO: Plot the forces from the model vs force plates
+masse_cadre = 270
