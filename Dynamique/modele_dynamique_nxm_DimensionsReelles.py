@@ -1136,9 +1136,6 @@ def interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_ancrage_rep
     Pt_ancrage_need_interpolation = np.ones((len(Pt_collecte_tab), 2*(m+n), 3))
     for frame in range(len(Pt_collecte_tab)):
 
-        if frame == 30:
-            embed()
-
         fig = plt.figure(1)
         ax = fig.add_subplot(111, projection='3d')
         ax.set_box_aspect([1.1, 1.8, 1])
@@ -1155,114 +1152,40 @@ def interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_ancrage_rep
                 ax.plot(Pt_ancrage_interpolated[frame, ind, 0], Pt_ancrage_interpolated[frame, ind, 1], Pt_ancrage_interpolated[frame, ind, 2], 'ob')
 
         known_indices = np.where(Pt_needs_interpolation[frame, :, 0] == 0)[0]
-        known_ancrage_indices = np.where(Pt_ancrage_need_interpolation[frame, :, 0] == 0)[0]
         missing_indices = np.where(Pt_needs_interpolation[frame, :, 0] == 1)[0]
         missing_ancrage_indices = np.where(Pt_ancrage_need_interpolation[frame, :, 0] == 1)[0]
-        # known_positions = Pt_interpolated[frame, known_indices, :]
 
-        # Fit a polynomial surface of degree 2
-        degree = 6
+        # Fit a polynomial surface to the points that we have
+        degree = 10
         model = make_pipeline(PolynomialFeatures(degree), LinearRegression())
-        model.fit(np.vstack((Pt_interpolated[frame, known_indices, :2], Pt_ancrage_interpolated[frame, known_ancrage_indices, :2])),
-                  np.vstack((np.reshape(Pt_interpolated[frame, known_indices, 2], (-1, 1)), np.reshape(Pt_ancrage_interpolated[frame, known_ancrage_indices, 2], (-1, 1)))))
-        Z_new = model.predict(Pt_repos[missing_indices, :2])
+        model.fit(np.vstack((Pt_interpolated[frame, known_indices, :2], Pt_ancrage_repos[:, :2])),
+                  np.vstack((np.reshape(Pt_interpolated[frame, known_indices, 2], (-1, 1)), np.reshape(Pt_ancrage_repos[:, 2], (-1, 1)))))
 
+        # Approximate the position of the missing markers + plot
+        Z_new = model.predict(Pt_repos[missing_indices, :2])
         ax.scatter(Pt_repos[missing_indices, 0],
                     Pt_repos[missing_indices, 1],
                    Z_new, marker='x', color='r', label='Predicted points')
         ax.scatter(Pt_ancrage_repos[missing_ancrage_indices, 0],
                    Pt_ancrage_repos[missing_ancrage_indices, 1],
-                   Pt_ancrage_repos[missing_ancrage_indices, 2], marker='x', color='r', label='Predicted points')
+                   Pt_ancrage_repos[missing_ancrage_indices, 2], marker='o', color='r')
 
         xx, yy = np.meshgrid(np.linspace(np.min(Pt_ancrage_repos[:, 0]), np.max(Pt_ancrage_repos[:, 0]), 50),
                              np.linspace(np.min(Pt_ancrage_repos[:, 1]), np.max(Pt_ancrage_repos[:, 1]), 50))
         zz = model.predict(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape)
         ax.plot_surface(xx, yy, zz, alpha=0.5, color='k', label='Fitted Surface')
 
-        # interpolated_position = scipy.interpolate.griddata(np.where(Pt_needs_interpolation[frame, :, 0] == 0)[0], Pt_interpolated[frame, :, :], Pt_needs_interpolation[frame, :, 0], method='cubic')
-        # ax.plot(interpolated_position[:, 0], interpolated_position[:, 1], interpolated_position[:, 2], 'xr', label="Gridata")
         ax.legend()
-        # view from the side
-        ax.view_init(90, 0)
+        ax.view_init(0, 90)
         ax.set_zlim(-1, 1)
-        plt.savefig("../Plots/interpolaion_frame_" + str(frame) + ".png")
+        if frame % 10 == 0:
+            plt.savefig("../Plots/interpolaion_frame_" + str(frame) + ".png")
         # plt.show()
 
-        # # To add interpolated points back to the known points list
-        # # for missing_idx in missing_indices:
-        # #     interpolated_position = griddata(known_indices, known_positions, missing_idx, method='cubic')
-        # #     known_points.append((missing_idx, interpolated_position))
-        #
-        #
-        #
-        # # Split the points by column + interpolation  based on splines (initial guess)
-        # # Pt_column = []
-        # Pt_column_interpolated = []
-        # for i in range(m):
-        #     Pt_column_i = np.zeros((n+2, 3))
-        #     Pt_column_repos_i = np.zeros((n+2, 3))
-        #     Pt_column_i[:, :] = np.nan
-        #     Pt_column_repos_i[:, :] = np.nan
-        #     Pt_column_i[0, :] = Pt_ancrage[frame, 2 * (n + m) - 1 - i, :]
-        #     Pt_column_repos_i[0, :] = Pt_ancrage_repos[2 * (n + m) - 1 - i, :]
-        #     Pt_column_i[1:n+1, :] = Pt_interpolated[frame, n * i : n * (i + 1), :]
-        #     Pt_column_repos_i[1:n+1, :] = Pt_repos[n * i : n * (i + 1), :]
-        #     Pt_column_i[-1, :] = Pt_ancrage[frame, n + i, :]
-        #     Pt_column_repos_i[-1, :] = Pt_ancrage_repos[n + i, :]
-        #     # Pt_column += [Pt_column_i]
-        #     nan_idx = np.where(np.isnan(Pt_column_i[:, 0]))[0]
-        #     non_nan_idx = np.where(np.isnan(Pt_column_i[:, 0]) != True)[0]
-        #     if np.sum(nan_idx) > 0:
-        #         tck, u = scipy.interpolate.splprep([Pt_column_i[non_nan_idx, 0], Pt_column_i[non_nan_idx, 1], Pt_column_i[non_nan_idx, 2]], s=2)
-        #         x_knots, y_knots, z_knots = scipy.interpolate.splev([Pt_column_repos_i[nan_idx, 0], Pt_column_repos_i[nan_idx, 1]], tck)
-        #
-        # ax.plot(Pt_column_interpolated[:, 0], Pt_column_interpolated[:, 1], Pt_column_interpolated[:, 2], 'xr', label="Columns")
-        #
-        # # Interpolation of the markers based on splines of the columns
-        # Pt_inter_liste = []
-        # for colonne in range(n):
-        #     for ind in range(m+2):
-        #         if Pt_column[colonne][ind, 0] == 0:
-        #             gauche = Pt_column[colonne][:, ind - 1]
-        #             j = 1
-        #             while Pt_column[colonne][0, ind + j] == 0:
-        #                 j += 1
-        #             droite = Pt_column[colonne][:, ind + j]
-        #             Pt_column[colonne][:, ind] = gauche + (droite - gauche) / (j + 1)
-        #     Pt_inter_liste += [Pt_column[colonne][:, 1:16]]
-        #
-        # ax.plot(Pt_rows_i[0, :], Pt_rows_i[1, :], Pt_rows_i[2, :], '.m', label="Rows")
-        #
-        #
-        #
-        #
-        #
-        # # ici
-        #
-        #
-        # from geomdl import fitting
-        # # Create a 3D surface with the markers we have
-        # surface_fit = fitting.approximate_surface(Pt_interpolated[Pt_needs_interpolation[frame, :, :], :, 0],
-        #                                           Pt_interpolated[Pt_needs_interpolation[frame, :, :], :, 1],
-        #                                           Pt_interpolated[Pt_needs_interpolation[frame, :, :], :, 2],
-        #                                           degree_u=3, degree_v=3)
-        # for ind in range(m*n):
-        #     if Pt_needs_interpolation[frame, ind, :] == 1:
-        #         Pt_interpolated[frame, ind, 2] = surface_fit(x, y)
-        #
-        # # on recolle les colonnes interpolées
-        # Pt_inter = []
-        # for i in range(9):
-        #     Pt_inter = np.vstack((Pt_inter, Pt_inter_liste[i]))
-        #
-        # Pt_interpolated[frame, :, :] = Pt_inter
-        #
-        # ax.plot(Pt_interpolated[frame, ind, 0], Pt_interpolated[frame, ind, 1], Pt_interpolated[frame, ind, 2], '.b', label="Markers")
-        # ax.legend()
-        # plt.savefig("Plots/interpolaion_frame_" + str(frame) + ".png")
-        # plt.show()
+        Pt_interpolated[frame, missing_indices, :2] = Pt_repos[missing_indices, :2]
+        Pt_interpolated[frame, missing_indices, 2] = Z_new[:, 0]
 
-    return Pt_inter
+    return Pt_interpolated
 
 def spring_bouts_collecte(Pt_interpolated):
     """
@@ -1335,23 +1258,23 @@ def Affichage_points_collecte_t(Pt_toile, Pt_ancrage, Ressort, nb_frame, ind_mas
     return ax
 
 
-def velocity_from_finite_difference(Pt_before, Pt_after, labels):
+def velocity_from_finite_difference(Pt_before, Pt_after, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
     """
     Approximates the velocity of the markers using the finite difference method.
     """
-    position_imoins1 = interpolation_collecte(Pt_before, labels)
-    position_iplus1 = interpolation_collecte(Pt_after, labels)
+    position_imoins1 = interpolation_collecte(Pt_before, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
+    position_iplus1 = interpolation_collecte(Pt_after, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
     distance_xyz = position_iplus1 - position_imoins1
     approx_velocity = distance_xyz / (2 * 0.002)
     return approx_velocity
 
 
-def integration_error(Pt_intergres, Pt_frame2):
+def integration_error(Pt_intergres, Pt_frame2, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
     """
     Computes the error between the point positions computed from integration and the actual markers
     """
 
-    position_iplus1 = interpolation_collecte(Pt_frame2, labels)
+    position_iplus1 = interpolation_collecte(Pt_frame2, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
     point_theorique = position_iplus1.T
 
     err_rel = (np.abs(point_theorique - Pt_intergres) / point_theorique)
@@ -1375,7 +1298,7 @@ def update(time, Pt_integrated, Pt_markers, integrated_point, markers_point):
 
     return
 
-def multiple_shooting_euler_integration(nb_frame, Pt_interpoles, labels):
+def multiple_shooting_euler_integration(nb_frame, Pt_interpoles, Pt_ancrage, labels):
     """
     Computes the position of the points by integrating (from the forces and initial conditions)
     -------
@@ -1392,15 +1315,15 @@ def multiple_shooting_euler_integration(nb_frame, Pt_interpoles, labels):
     relative_error, absolute_error = [], []
 
     # Velocity of the second frame by finite difference
-    current_velocity = velocity_from_finite_difference(Pt_interpoles[0], Pt_interpoles[2], labels)
+    current_velocity = velocity_from_finite_difference(Pt_interpoles[0], Pt_interpoles[2], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
     Velocity_tot[0, :, :] = current_velocity.T
 
-    Pt_tot[0, :, :] = interpolation_collecte(Pt_interpoles[0], labels).T
+    Pt_tot[0, :, :] = interpolation_collecte(Pt_interpoles[0], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels).T
 
     for frame in range(nb_frame - 1):
 
         # --- At the current frame ---#
-        Pt_interpolated = interpolation_collecte(Pt_interpoles[frame], labels)
+        Pt_interpolated = interpolation_collecte(Pt_interpoles[frame], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
         bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt_interpolated)
 
         # Computation the forces based on the state of the model
@@ -1452,7 +1375,7 @@ def single_shooting_euler_integration(nb_frame, Pt_interpoles, labels):
     initial_velocity = velocity_from_finite_difference(Pt_interpoles[0], Pt_interpoles[2], labels)
     Velocity_tot[0, :, :] = initial_velocity.T
 
-    Pt_interpolated = interpolation_collecte(Pt_interpoles[0], labels)
+    Pt_interpolated = interpolation_collecte(Pt_interpoles[0], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
     Pt_tot[0, :, :] = Pt_interpolated.T
 
     for frame in range(nb_frame - 1):
@@ -1534,8 +1457,8 @@ def multiple_shooting_integration(nb_frame, Pt_interpoles, labels):
 
     Pt_interpolated = np.zeros((nb_frame, n * m, 3))
     for frame in range(nb_frame):
-        Pt_interpolated[frame, :, :] = interpolation_collecte(Pt_interpoles[frame], labels).T
-    Pt_tot[0, :, :] = interpolation_collecte(Pt_interpoles[0], labels).T
+        Pt_interpolated[frame, :, :] = interpolation_collecte(Pt_interpoles[frame], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels).T
+    Pt_tot[0, :, :] = interpolation_collecte(Pt_interpoles[0], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels).T
 
     for frame in range(nb_frame - 1):
 
