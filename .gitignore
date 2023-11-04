@@ -10,3 +10,5 @@ Data/Pictures/
 *.mp4
 
 Plots/
+
+.idea/

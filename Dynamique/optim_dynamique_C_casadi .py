@@ -2,7 +2,7 @@
 Optimization of the damping parameters (C) of the trampoline bed.
 The elasticity coefficients are taken from the static optimization (K are constants).
 
-Optimisation variables:
+Optimization variables:
     - C
     - X
     - Xdot
