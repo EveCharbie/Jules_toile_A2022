@@ -1112,7 +1112,7 @@ def Point_toile_init(Point_collecte, labels):
     return point_toile, label_toile
 
 
-def surface_interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
+def surface_interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels, with_plot=False):
     """
     Interpolate to fill the missing markers.
     """
@@ -1125,20 +1125,23 @@ def surface_interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_anc
     Pt_ancrage_need_interpolation = np.ones((len(Pt_collecte_tab), 2*(m+n), 3))
     for frame in range(len(Pt_collecte_tab)):
 
-        fig = plt.figure(1)
-        ax = fig.add_subplot(111, projection='3d')
-        ax.set_box_aspect([1.1, 1.8, 1])
+        if with_plot:
+            fig = plt.figure(1)
+            ax = fig.add_subplot(111, projection='3d')
+            ax.set_box_aspect([1.1, 1.8, 1])
 
         # Fill markers data that we have
         for ind in range(m*n):
             if "t" + str(ind) in labels and np.isnan(Pt_collecte_tab[frame][0, labels.index("t" + str(ind))]) == False:
                 Pt_interpolated[frame, ind, :] = Pt_collecte_tab[frame][:, labels.index("t" + str(ind))]
                 Pt_needs_interpolation[frame, ind, :] = 0
-                ax.plot(Pt_interpolated[frame, ind, 0], Pt_interpolated[frame, ind, 1], Pt_interpolated[frame, ind, 2], '.b')
+                if with_plot:
+                    ax.plot(Pt_interpolated[frame, ind, 0], Pt_interpolated[frame, ind, 1], Pt_interpolated[frame, ind, 2], '.b')
             elif "C" + str(ind) in labels and np.isnan(Pt_ancrage[frame, labels.index("C" + str(ind)), 0]) == False:
                 Pt_ancrage_interpolated[frame, ind, :] = Pt_ancrage[frame, labels.index("C" + str(ind)), :]
                 Pt_ancrage_need_interpolation[frame, ind, :] = 0
-                ax.plot(Pt_ancrage_interpolated[frame, ind, 0], Pt_ancrage_interpolated[frame, ind, 1], Pt_ancrage_interpolated[frame, ind, 2], 'ob')
+                if with_plot:
+                    ax.plot(Pt_ancrage_interpolated[frame, ind, 0], Pt_ancrage_interpolated[frame, ind, 1], Pt_ancrage_interpolated[frame, ind, 2], 'ob')
 
         known_indices = np.where(Pt_needs_interpolation[frame, :, 0] == 0)[0]
         missing_indices = np.where(Pt_needs_interpolation[frame, :, 0] == 1)[0]
@@ -1152,24 +1155,27 @@ def surface_interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_anc
 
         # Approximate the position of the missing markers + plot
         Z_new = model.predict(Pt_repos[missing_indices, :2])
-        ax.scatter(Pt_repos[missing_indices, 0],
-                    Pt_repos[missing_indices, 1],
-                   Z_new, marker='x', color='r', label='Predicted points')
-        ax.scatter(Pt_ancrage_repos[missing_ancrage_indices, 0],
-                   Pt_ancrage_repos[missing_ancrage_indices, 1],
-                   Pt_ancrage_repos[missing_ancrage_indices, 2], marker='o', color='r')
+        if with_plot:
+            ax.scatter(Pt_repos[missing_indices, 0],
+                        Pt_repos[missing_indices, 1],
+                       Z_new, marker='x', color='r', label='Predicted points')
+            ax.scatter(Pt_ancrage_repos[missing_ancrage_indices, 0],
+                       Pt_ancrage_repos[missing_ancrage_indices, 1],
+                       Pt_ancrage_repos[missing_ancrage_indices, 2], marker='o', color='r')
 
         xx, yy = np.meshgrid(np.linspace(np.min(Pt_ancrage_repos[:, 0]), np.max(Pt_ancrage_repos[:, 0]), 50),
                              np.linspace(np.min(Pt_ancrage_repos[:, 1]), np.max(Pt_ancrage_repos[:, 1]), 50))
         zz = model.predict(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape)
-        ax.plot_surface(xx, yy, zz, alpha=0.5, color='k', label='Fitted Surface')
 
-        ax.legend()
-        ax.view_init(0, 90)
-        ax.set_zlim(-1, 1)
-        if frame % 10 == 0:
-            plt.savefig("../Plots/interpolaion_frame_" + str(frame) + ".png")
-        # plt.show()
+        if with_plot:
+            ax.plot_surface(xx, yy, zz, alpha=0.5, color='k', label='Fitted Surface')
+
+            ax.legend()
+            ax.view_init(0, 90)
+            ax.set_zlim(-1, 1)
+            if frame % 10 == 0:
+                plt.savefig("../Plots/interpolaion_frame_" + str(frame) + ".png")
+            # plt.show()
 
         Pt_interpolated[frame, missing_indices, :2] = Pt_repos[missing_indices, :2]
         Pt_interpolated[frame, missing_indices, 2] = Z_new[:, 0]
