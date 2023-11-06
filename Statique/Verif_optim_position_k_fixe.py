@@ -12,9 +12,16 @@ from mpl_toolkits import mplot3d
 import time
 from scipy.interpolate import interp1d
 import pickle
+import sys
 
-from Optim_35_essais_kM_regul_koblique import Calcul_Pt_F, Pt_bounds, m_bounds, Param_fixe, get_list_results_static
+from Optim_35_essais_kM_regul_koblique import Calcul_Pt_F, Param_fixe, get_list_results_static, a_minimiser
+from Optim_multi_essais_kM_regul_koblique import Pt_bounds, m_bounds
 
+sys.path.append("../Dynamique/")
+from modele_dynamique_nxm_DimensionsReelles import Points_ancrage_repos
+
+sys.path.append("../")
+from enums import InitialGuessType
 
 n = 15  # nombre de mailles sur le grand cote
 m = 9  # nombre de mailles sur le petit cote
@@ -135,6 +142,7 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
     # PARAM FIXES
     n = 15
     m = 9
+    Pt_ancrage_repos, Pt_repos = Points_ancrage_repos(dict_fixed_params)
 
     # OPTIMISATION :
     # Start with an empty NLP
@@ -148,30 +156,31 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
 
     # NLP VALUES
     Ma = cas.MX.sym("Ma", 5)
-    X = cas.MX.sym("X", 135 * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
+    X = cas.MX.sym("X", n*m * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
 
     # Ma
-    w0_m, lbw_m, ubw_m = m_bounds()
+    w0_m, lbw_m, ubw_m = m_bounds(Masse_centre)
     w0 += w0_m
     lbw += lbw_m
     ubw += ubw_m
     w += [Ma]
 
     # X
-    w0_Pt, lbw_Pt, ubw_Pt = Pt_bounds(initial_guess, Pt_collecte[i], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels[i])
+    w0_Pt, lbw_Pt, ubw_Pt = Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
     lbw += lbw_Pt
     ubw += ubw_Pt
     w0 += w0_Pt
     w += [X]
 
     # fonction contrainte :
-    g += [Ma[0] + Ma[1] + Ma[2] + Ma[3] + Ma[4] - Masse_centre[i]]
+    g += [Ma[0] + Ma[1] + Ma[2] + Ma[3] + Ma[4] - Masse_centre]
     lbg += [0]
     ubg += [0]
 
     # en statique on ne fait pas de boucle sur le temps :
-    J = a_minimiser(X, M, F_totale_collecte, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, min_energie, ind_masse)
-    obj = J(X, M)
+    K, _, _ = Param_variable(Ma, ind_masse)
+    J = a_minimiser(X, K, Ma, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, ind_masse, optimize_static_mass,)
+    obj = J(X, Ma)
 
     # Create an NLP solver
     prob = {"f": obj, "x": cas.vertcat(*w), "g": cas.vertcat(*g)}
@@ -220,13 +229,13 @@ def main():
     ##########################################################################################################################
 
     start_main = time.time()
-    
+
     Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f = Optimisation(
-        F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params
+        F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params,
     )
 
     M = np.array(Solution[0:5])
-    Pt = np.reshape(Solution[5:], (135, 3))
+    Pt = np.reshape(Solution[5:], (n*m, 3))
     print("M = " + str(M))
     end_main = time.time()
 
