@@ -30,6 +30,12 @@ import time
 from scipy.interpolate import interp1d
 import pickle
 
+import sys
+sys.path.append("../")
+from enums import InitialGuessType
+sys.path.append("../Dynamique/")
+from modele_dynamique_nxm_DimensionsReelles import surface_interpolation_collecte
+
 
 n = 15  # nombre de mailles sur le grand cote
 m = 9  # nombre de mailles sur le petit cote
@@ -40,17 +46,8 @@ Nb_ressorts_croix = 2 * (m - 1) * (n - 1)  # nombre de ressorts obliques dans la
 Nb_ressorts_horz = n * (m - 1)  # nombre de ressorts horizontaux dans la toile (pas dans le cadre)
 Nb_ressorts_vert = m * (n - 1)  # nombre de ressorts verticaux dans la toile (pas dans le cadre)
 
-masse_type = "repartie"  #'ponctuelle' #'repartie'
-
-
 # FONCTIONS AVEC LES PARAMÈTRES FIXES :
-def Param_fixe(ind_masse, Masse_centre):
-    """
-
-    :param ind_masse: int: indice du point où la masse est appliquée dans la collecte (point qui descend le plus bas)
-    :param Masse_centre: float: masse appliquée au point d'indice ind_masse
-    :return: dict_fixed_params: dictionnaire contenant tous les paramètres fixes (longueurs, l_repos, masses)
-    """
+def Param_fixe():
     # ESPACES ENTRE LES MARQUEURS :
 
     # de bas en haut :
@@ -249,7 +246,7 @@ def Param_variable(k_type):
     return k, k_oblique
 
 
-######################################################################################################################
+#####################################################################################################################
 
 
 def Param_variable_masse(ind_masse, Ma):
@@ -655,11 +652,11 @@ def Force_point(F_spring, F_spring_croix, F_masses):  # --> resultante des force
     return F_point
 
 
-def Resultat_PF_collecte(participant, vide_name, trial_name, frame):
+def Resultat_PF_collecte(participant, empty_trial_name, trial_name, frame):
     """
     Regroupe tous les calculs pour traiter les données des PF et des caméras et les retourner afin de les utiliser pour l'optimisation
     :param participant: int: numéro du participant correspondant à l'essai
-    :param vide_name: str: nom de l'essai vide correspondant à l'essai statique
+    :param empty_trial_name: str: nom de l'essai vide correspondant à l'essai statique
     :param trial_name: str: nom de l'essai dynamique étudié
     :param frame: int: numéro du frame étudié
 
@@ -947,7 +944,7 @@ def Resultat_PF_collecte(participant, vide_name, trial_name, frame):
         return label_min
 
     if participant == 0:
-        c3d_vide = open_c3d(0, vide_name)
+        c3d_vide = open_c3d(0, empty_trial_name)
         c3d_statique = open_c3d(0, trial_name)
         platform = soustraction_vide(
             c3d_statique, c3d_vide
@@ -995,17 +992,17 @@ def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
     :return: Pt_interpole: DM(3,135) (même dimension que Pos_repos)
     """
     # liste avec les bons points aux bons endroits, et le reste vaut 0
-    Pt_interpole = cas.DM.zeros((3, 135))
+    Pt_interpolated = cas.DM.zeros((3, 135))
     for ind in range(135):
         if "t" + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index("t" + str(ind))]) == False:
-            Pt_interpole[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]
+            Pt_interpolated[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]
 
     # séparation des colonnes
     Pt_colonnes = []
     for i in range(9):
         Pt_colonnei = cas.DM.zeros((3, 17))
         Pt_colonnei[:, 0] = Pt_ancrage[2 * (n + m) - 1 - i, :]
-        Pt_colonnei[:, 1:16] = Pt_interpole[:, 15 * i : 15 * (i + 1)]
+        Pt_colonnei[:, 1:16] = Pt_interpolated[:, 15 * i : 15 * (i + 1)]
         Pt_colonnei[:, -1] = Pt_ancrage[n + i, :]
         Pt_colonnes += [Pt_colonnei]
 
@@ -1055,7 +1052,7 @@ def tab2list(tab):
     return list
 
 
-def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
+def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, optimize_static_mass):
     k, k_croix = Param_variable(K)
     M = Param_variable_masse(ind_masse, Ma)
     Pt = list2tab(X)
@@ -1067,25 +1064,26 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
     )
     F_point = Force_point(F_spring, F_spring_croix, F_masses)
 
-    # a verifier :
     F_totale = cas.MX.zeros(3)
     for ind in range(F_point.shape[0]):
-        for i in range(3):
-            F_totale[i] += F_point[ind, i]
+        if ind in ind_masse and optimize_static_mass == False:
+            continue
+        else:
+            for i in range(3):
+                F_totale[i] += F_point[ind, i]
 
     return F_totale, F_point
 
 
 def a_minimiser(
-    X, K, Ma, F_totale_collecte, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, min_energie, ind_masse
+    X, K, Ma, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, ind_masse, optimize_static_mass
 ):
-    F_totale, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma)
+    F_totale, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, optimize_static_mass)
     Pt = list2tab(X)
     Pt_inter = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
 
     Difference = cas.MX.zeros(1)
     for i in range(3):
-        # Difference += (F_totale_collecte[i] - F_totale[i]) ** 2
 
         for ind in range(n * m):
             Difference += (F_point[ind, i]) ** 2
@@ -1106,7 +1104,6 @@ def a_minimiser(
                 else:
                     Difference += (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
 
-    regul_k = cas.MX.zeros(1)
     regul_k = K[8] ** 2 + K[9] ** 2 + K[10] ** 2 + K[11] ** 2
 
     output = (1e4) * Difference + (1e-6) * regul_k
@@ -1132,12 +1129,31 @@ def longueur_ressort(dict_fixed_params, Pt, Pt_ancrage):
     return delta
 
 
-def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initial_guess, min_energie):  # main
-    def k_bounds():  # initial guess pour les k et les C
-        """
-        Calculer les limites et l'initial guess des k_type
-        :return:
-        """
+def get_list_results_static(participant, trial_name, frame, dict_fixed_params):
+
+    F_totale_collecte = []
+    Pt_collecte = []
+    ind_masse = []
+    labels = []
+    Pt_ancrage = []
+
+    for i in range(len(trial_name)):
+        empty_trial_name = "labeled_statique_centrefront_vide"
+        if "front" not in trial_name[i]:
+            empty_trial_name = "labeled_statique_vide"
+
+        Resultat_PF_collecte_total = Resultat_PF_collecte(participant[i], empty_trial_name, trial_name[i], frame)
+        F_totale_collecte.append(Resultat_PF_collecte_total[0])
+        Pt_collecte.append(Resultat_PF_collecte_total[1])
+        labels.append(Resultat_PF_collecte_total[2])
+        ind_masse.append(Resultat_PF_collecte_total[3])
+        Pt_ancrage.append(Points_ancrage_repos(dict_fixed_params)[0])
+
+    return F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage
+
+def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params):
+    def k_bounds():
+
         k1 = 3381.540529105023  # un type de coin (ressort horizontal)
         k2 = 4094.5093125505978  # ressorts horizontaux du bord (bord vertical) : relient le cadre et la toile
         k3 = 682.2755546467131  # un type de coin (ressort vertical)
@@ -1162,10 +1178,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
         return w0_k, lbw_k, ubw_k
 
     def m_bounds(masse_essai):
-        """
-        Calculer les limites et l'initial guess des masses
-        :return:
-        """
+
         lbw_m, ubw_m = [], []
 
         M1 = masse_essai / 5  # masse centre
@@ -1180,13 +1193,19 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
 
         return w0_m, lbw_m, ubw_m
 
-    def Pt_bounds_interp(Pt_collecte, Pt_ancrage, labels, F_totale_collecte):
+    def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
         """
-        Calculer les limites et l'initial guess des coordonnées des points
-        :param Pos:
-        :return:
+        Returns the bounds on the position of the points of the model based on the interpolation of the missing points.
         """
-        Pt_inter = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
+
+        if isinstance(initial_guess, InitialGuessType.LINEAR_INTERPOLATION):
+            Pt_interpolated = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
+        elif isinstance(initial_guess, InitialGuessType.RESTING_POSITION):
+            Pt_interpolated = Pt_repos
+        elif isinstance(initial_guess, InitialGuessType.SURFACE_INTERPOLATION):
+            Pt_interpolated = surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
+        else:
+            raise RuntimeError(f"The interpolation type of the initial guess {initial_guess} is not recognized.")
 
         # bounds and initial guess
         lbw_Pt = []
@@ -1195,46 +1214,19 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
 
         for k in range(405):
             if k % 3 == 0:  # limites et guess en x
-                lbw_Pt += [Pt_inter[0, int(k // 3)] - 0.3]
-                ubw_Pt += [Pt_inter[0, int(k // 3)] + 0.3]
-                w0_Pt += [Pt_inter[0, int(k // 3)]]
+                lbw_Pt += [Pt_interpolated[0, int(k // 3)] - 0.3]
+                ubw_Pt += [Pt_interpolated[0, int(k // 3)] + 0.3]
+                w0_Pt += [Pt_interpolated[0, int(k // 3)]]
             if k % 3 == 1:  # limites et guess en y
-                lbw_Pt += [Pt_inter[1, int(k // 3)] - 0.3]
-                ubw_Pt += [Pt_inter[1, int(k // 3)] + 0.3]
-                w0_Pt += [Pt_inter[1, int(k // 3)]]
+                lbw_Pt += [Pt_interpolated[1, int(k // 3)] - 0.3]
+                ubw_Pt += [Pt_interpolated[1, int(k // 3)] + 0.3]
+                w0_Pt += [Pt_interpolated[1, int(k // 3)]]
             if k % 3 == 2:  # limites et guess en z
                 lbw_Pt += [-2]
                 ubw_Pt += [0.5]
-                w0_Pt += [Pt_inter[2, int(k // 3)]]
+                w0_Pt += [Pt_interpolated[2, int(k // 3)]]
 
-        return lbw_Pt, ubw_Pt, w0_Pt
-
-    def Pt_bounds_repos(Pos, Masse_centre):
-        """
-        Calculer les limites et l'initial guess des coordonnées des points
-        :param Pos:
-        :return:
-        """
-        # bounds and initial guess
-        lbw_Pt = []
-        ubw_Pt = []
-        w0_Pt = []
-
-        for k in range(405):
-            if k % 3 == 0:  # limites et guess en x
-                lbw_Pt += [Pos[int(k // 3), 0] - 0.3]
-                ubw_Pt += [Pos[int(k // 3), 0] + 0.3]
-                w0_Pt += [Pos[int(k // 3), 0]]
-            if k % 3 == 1:  # limites et guess en y
-                lbw_Pt += [Pos[int(k // 3), 1] - 0.3]
-                ubw_Pt += [Pos[int(k // 3), 1] + 0.3]
-                w0_Pt += [Pos[int(k // 3), 1]]
-            if k % 3 == 2:  # limites et guess en z
-                lbw_Pt += [-2]
-                ubw_Pt += [0.5]
-                w0_Pt += [Pos[int(k // 3), 2]]
-
-        return lbw_Pt, ubw_Pt, w0_Pt
+        return w0_Pt, lbw_Pt, ubw_Pt
 
     # PARAM FIXES
     n = 15
@@ -1258,40 +1250,13 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
     ubw += ubw_k
     w += [K]
 
-    F_totale_collecte = []
-    Pt_collecte = []
-    Pt_ancrage = []
-    ind_masse = []
-    labels = []
-
     obj = 0
-    for i in range(len(essais)):
+    for i in range(len(trial_name)):
         masse_essai = Masse_centre[i]
-
-        # RESULTAT COLLECTE pour les essai
-        # initalisation des listes contenant les resultats pour traitements separes des essais apres optimisation
-
-        vide_name = "labeled_statique_centrefront_vide"
-        if "front" not in trial_name[i]:
-            vide_name = "labeled_statique_vide"
-
-        Resultat_PF_collecte_total = Resultat_PF_collecte(participant[i], vide_name, trial_name[i], frame)
-        F_totale_collecte.append(Resultat_PF_collecte_total[0])
-        Pt_collecte.append(Resultat_PF_collecte_total[1])
-        labels.append(Resultat_PF_collecte_total[2])
-        ind_masse.append(Resultat_PF_collecte_total[3])
-
-        dict_fixed_params = Param_fixe(ind_masse[i], Masse_centre[i])
-        Pos_repos = Points_ancrage_repos(dict_fixed_params)[1]
-        Pt_ancrage.append(Points_ancrage_repos(dict_fixed_params)[0])
 
         # NLP VALUES
         Ma = cas.MX.sym("Ma", 5)
         X = cas.MX.sym("X", 135 * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
-        if initial_guess == "interpolation":
-            lbw_Pt, ubw_Pt, w0_Pt = Pt_bounds_interp(Pt_collecte[i], Pt_ancrage[i], labels[i], F_totale_collecte)
-        if initial_guess == "repos":
-            lbw_Pt, ubw_Pt, w0_Pt = Pt_bounds_repos(Pos_repos, Masse_centre[i])
 
         # Ma
         w0_m, lbw_m, ubw_m = m_bounds(masse_essai)
@@ -1301,6 +1266,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
         w += [Ma]
 
         # X
+        w0_Pt, lbw_Pt, ubw_Pt = Pt_bounds(initial_guess, Pt_collecte[i], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels[i])
         lbw += lbw_Pt
         ubw += ubw_Pt
         w0 += w0_Pt
@@ -1316,13 +1282,12 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
             X,
             K,
             Ma,
-            F_totale_collecte,
             Pt_collecte[i],
             Pt_ancrage[i],
             dict_fixed_params,
             labels[i],
-            min_energie,
             ind_masse[i],
+            optimize_static_mass,
         )
         obj += J(X, K, Ma)
 
@@ -1341,247 +1306,252 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
 
 
 ##########################################################################################################################
+def main():
 
-# PARAM OPTIM :
-min_energie = 1  # 0 #1
-initial_guess = "interpolation"  #'interpolation' #'repos'
+    initial_guess = InitialGuessType.RESTING_POSITION  ### to be tested with SURFACE_INTERPOLATION
+    optimize_static_mass = True
 
-# Liste des deux essais a optimiser
-essais = []
-participants = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-nb_disques = [
-    2,
-    3,
-    4,
-    5,
-    6,
-    8,
-    8,
-    9,
-    10,
-    11,
-    11,
-    6,
-    9,
-    2,
-    7,
-    8,
-    3,
-    10,
-    1,
-    2,
-    7,
-    6,
-    5,
-    10,
-    1,
-    7,
-    6,
-    3,
-    8,
-    1,
-    9,
-    7,
-    11,
-    4,
-    10,
-]  # choix des 35 masses
-# premier essai
-frame = 700
+    # Liste des deux essais a optimiser
+    essais = []
+    participants = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    nb_disques = [
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        8,
+        9,
+        10,
+        11,
+        11,
+        6,
+        9,
+        2,
+        7,
+        8,
+        3,
+        10,
+        1,
+        2,
+        7,
+        6,
+        5,
+        10,
+        1,
+        7,
+        6,
+        3,
+        8,
+        1,
+        9,
+        7,
+        11,
+        4,
+        10,
+    ]  # choix des 35 masses
+    # premier essai
+    frame = 700
 
-# juste faire attention aux doublons avec la liste des disques au dessus
-essais += ["labeled_statique_centrefront_D" + str(nb_disques[0])]
-essais += ["labeled_statique_D" + str(nb_disques[1])]
-essais += ["labeled_statique_leftfront_D" + str(nb_disques[2])]
-essais += ["labeled_statique_left_D" + str(nb_disques[3])]
-essais += ["labeled_statique_centrefront_D" + str(nb_disques[4])]
-essais += ["labeled_statique_D" + str(nb_disques[5])]
-essais += ["labeled_statique_leftfront_D" + str(nb_disques[6])]
-essais += ["labeled_statique_left_D" + str(nb_disques[7])]
-essais += ["labeled_statique_centrefront_D" + str(nb_disques[8])]
-essais += ["labeled_statique_D" + str(nb_disques[9])]
+    # juste faire attention aux doublons avec la liste des disques au dessus
+    essais += ["labeled_statique_centrefront_D" + str(nb_disques[0])]
+    essais += ["labeled_statique_D" + str(nb_disques[1])]
+    essais += ["labeled_statique_leftfront_D" + str(nb_disques[2])]
+    essais += ["labeled_statique_left_D" + str(nb_disques[3])]
+    essais += ["labeled_statique_centrefront_D" + str(nb_disques[4])]
+    essais += ["labeled_statique_D" + str(nb_disques[5])]
+    essais += ["labeled_statique_leftfront_D" + str(nb_disques[6])]
+    essais += ["labeled_statique_left_D" + str(nb_disques[7])]
+    essais += ["labeled_statique_centrefront_D" + str(nb_disques[8])]
+    essais += ["labeled_statique_D" + str(nb_disques[9])]
 
-essais += ["labeled_statique_leftfront_D" + str(nb_disques[10])]
-essais += ["labeled_statique_left_D" + str(nb_disques[11])]
-essais += ["labeled_statique_centrefront_D" + str(nb_disques[12])]
-essais += ["labeled_statique_D" + str(nb_disques[13])]
-essais += ["labeled_statique_leftfront_D" + str(nb_disques[14])]
-essais += ["labeled_statique_left_D" + str(nb_disques[15])]
-essais += ["labeled_statique_centrefront_D" + str(nb_disques[16])]
-essais += ["labeled_statique_D" + str(nb_disques[17])]
-essais += ["labeled_statique_leftfront_D" + str(nb_disques[18])]
-essais += ["labeled_statique_left_D" + str(nb_disques[19])]
+    essais += ["labeled_statique_leftfront_D" + str(nb_disques[10])]
+    essais += ["labeled_statique_left_D" + str(nb_disques[11])]
+    essais += ["labeled_statique_centrefront_D" + str(nb_disques[12])]
+    essais += ["labeled_statique_D" + str(nb_disques[13])]
+    essais += ["labeled_statique_leftfront_D" + str(nb_disques[14])]
+    essais += ["labeled_statique_left_D" + str(nb_disques[15])]
+    essais += ["labeled_statique_centrefront_D" + str(nb_disques[16])]
+    essais += ["labeled_statique_D" + str(nb_disques[17])]
+    essais += ["labeled_statique_leftfront_D" + str(nb_disques[18])]
+    essais += ["labeled_statique_left_D" + str(nb_disques[19])]
 
-essais += ["labeled_statique_centrefront_D" + str(nb_disques[20])]
-essais += ["labeled_statique_D" + str(nb_disques[21])]
-essais += ["labeled_statique_leftfront_D" + str(nb_disques[22])]
-essais += ["labeled_statique_left_D" + str(nb_disques[23])]
-essais += ["labeled_statique_centrefront_D" + str(nb_disques[24])]
-essais += ["labeled_statique_D" + str(nb_disques[25])]
-essais += ["labeled_statique_leftfront_D" + str(nb_disques[26])]
-essais += ["labeled_statique_left_D" + str(nb_disques[27])]
-essais += ["labeled_statique_centrefront_D" + str(nb_disques[28])]
-essais += ["labeled_statique_D" + str(nb_disques[29])]
+    essais += ["labeled_statique_centrefront_D" + str(nb_disques[20])]
+    essais += ["labeled_statique_D" + str(nb_disques[21])]
+    essais += ["labeled_statique_leftfront_D" + str(nb_disques[22])]
+    essais += ["labeled_statique_left_D" + str(nb_disques[23])]
+    essais += ["labeled_statique_centrefront_D" + str(nb_disques[24])]
+    essais += ["labeled_statique_D" + str(nb_disques[25])]
+    essais += ["labeled_statique_leftfront_D" + str(nb_disques[26])]
+    essais += ["labeled_statique_left_D" + str(nb_disques[27])]
+    essais += ["labeled_statique_centrefront_D" + str(nb_disques[28])]
+    essais += ["labeled_statique_D" + str(nb_disques[29])]
 
-essais += ["labeled_statique_leftfront_D" + str(nb_disques[30])]
-essais += ["labeled_statique_left_D" + str(nb_disques[31])]
-essais += ["labeled_statique_centrefront_D" + str(nb_disques[32])]
-essais += ["labeled_statique_D" + str(nb_disques[33])]
-essais += ["labeled_statique_leftfront_D" + str(nb_disques[34])]
-
-
-participant = []  # creation d une liste pour gerer les participants
-trial_name = []  # creation d une liste pour gerer les essais
-vide_name = [
-    "labeled_statique_centrefront_vide",
-    "labeled_statique_vide",
-]  # creation d une liste pour les essais a vide
-Masse_centre = []
-for i in range(len(essais)):  # ici 2 essais seulement
-    trial_name.append(essais[i])
-    participant.append(participants[i - 1])
-    essai_vide = vide_name[0]
-    print(trial_name[i])
-    if "front" not in trial_name[i]:
-        essai_vide = vide_name[1]
-    print(essai_vide)
-
-    if participant[i] != 0:  # si humain choisi
-        masses = [64.5, 87.2]
-        Masse_centre.append(
-            masses[participants[i] - 1]
-        )  # on recupere dans la liste au-dessus, attention aux indices (-1)
-        print("masse appliquée pour le participant " + str(participant[i]) + " = " + str(Masse_centre[i]) + " kg")
-
-    if participant[i] == 0:  # avec des poids
-        masses = [0, 27.0, 47.1, 67.3, 87.4, 102.5, 122.6, 142.8, 163.0, 183.1, 203.3, 228.6]
-        Masse_centre.append(masses[nb_disques[i]])
-        print("masse appliquée pour " + str(nb_disques[i]) + " disques = " + str(Masse_centre[i]) + " kg")
+    essais += ["labeled_statique_leftfront_D" + str(nb_disques[30])]
+    essais += ["labeled_statique_left_D" + str(nb_disques[31])]
+    essais += ["labeled_statique_centrefront_D" + str(nb_disques[32])]
+    essais += ["labeled_statique_D" + str(nb_disques[33])]
+    essais += ["labeled_statique_leftfront_D" + str(nb_disques[34])]
 
 
-########################################################################################################################
+    participant = []  # creation d une liste pour gerer les participants
+    trial_name = []  # creation d une liste pour gerer les essais
+    empty_trial_name = [
+        "labeled_statique_centrefront_vide",
+        "labeled_statique_vide",
+    ]  # creation d une liste pour les essais a vide
+    Masse_centre = []
+    for i in range(len(essais)):  # ici 2 essais seulement
+        trial_name.append(essais[i])
+        participant.append(participants[i - 1])
+        essai_vide = empty_trial_name[0]
+        print(trial_name[i])
+        if "front" not in trial_name[i]:
+            essai_vide = empty_trial_name[1]
+        print(essai_vide)
 
-start_main = time.time()
+        if participant[i] != 0:  # si humain choisi
+            masses = [64.5, 87.2]
+            Masse_centre.append(
+                masses[participants[i] - 1]
+            )  # on recupere dans la liste au-dessus, attention aux indices (-1)
+            print("masse appliquée pour le participant " + str(participant[i]) + " = " + str(Masse_centre[i]) + " kg")
 
-Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f = Optimisation(
-    participant, Masse_centre, trial_name, vide_name, frame, initial_guess, min_energie
-)
+        if participant[i] == 0:  # avec des poids
+            masses = [0, 27.0, 47.1, 67.3, 87.4, 102.5, 122.6, 142.8, 163.0, 183.1, 203.3, 228.6]
+            Masse_centre.append(masses[nb_disques[i]])
+            print("masse appliquée pour " + str(nb_disques[i]) + " disques = " + str(Masse_centre[i]) + " kg")
 
-# recuperation et affichage
-k = np.array(Solution[:12])
-M = []
-Pt = []
-F_totale = []
-F_point = []
+    dict_fixed_params = Param_fixe()
+    F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage = get_list_results_static(participant, trial_name, frame, dict_fixed_params)
 
-for i in range(len(essais)):
-    M.append(np.array(Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i]))
-    Pt.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
+    ########################################################################################################################
 
-    F_totale.append(
-        Calcul_Pt_F(
-            Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],
-            Pt_ancrage[i],
-            dict_fixed_params,
-            k,
-            ind_masse[i],
-            Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i],
-        )[0]
-    )
-    F_point.append(
-        Calcul_Pt_F(
-            Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],
-            Pt_ancrage[i],
-            dict_fixed_params,
-            k,
-            ind_masse[i],
-            Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i],
-        )[1]
+    start_main = time.time()
+
+    Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f = Optimisation(
+        F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params
     )
 
-    F_totale[i] = cas.evalf(F_totale[i])
-    F_point[i] = cas.evalf(F_point[i])
-    F_point[i] = np.array(F_point[i])
+    # recuperation et affichage
+    k = np.array(Solution[:12])
+    M = []
+    Pt = []
+    F_totale = []
+    F_point = []
 
-    Pt_collecte[i] = np.array(Pt_collecte[i])  # permet de mettre pt collecte sous la bonne forme pour l'utiliser apres
-    Pt_ancrage[i] = np.array(Pt_ancrage[i])  # permet de mettre pt ancrage sous la bonne forme pour l'utiliser apres
+    for i in range(len(essais)):
+        M.append(np.array(Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i]))
+        Pt.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
 
-end_main = time.time()
-temps_min = (end_main - start_main) / 60
+        F_totale.append(
+            Calcul_Pt_F(
+                Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],
+                Pt_ancrage[i],
+                dict_fixed_params,
+                k,
+                ind_masse[i],
+                Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i],
+            )[0]
+        )
+        F_point.append(
+            Calcul_Pt_F(
+                Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],
+                Pt_ancrage[i],
+                dict_fixed_params,
+                k,
+                ind_masse[i],
+                Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i],
+            )[1]
+        )
 
-print("**************************************************************************")
-print("Temps total : " + str(temps_min) + " min")
-print("**************************************************************************")
+        F_totale[i] = cas.evalf(F_totale[i])
+        F_point[i] = cas.evalf(F_point[i])
+        F_point[i] = np.array(F_point[i])
 
-############################################################################################################
-# Comparaison entre collecte et points optimisés :
-fig = plt.figure()
-for i in range(len(essais)):
-    ax = plt.subplot(5, 7, i + 1, projection="3d")
-    ax.set_box_aspect([1.1, 1.8, 1])
-    ax.plot(Pt[i][:, 0], Pt[i][:, 1], Pt[i][:, 2], "+r", label="Points de la toile optimisés")
-    ax.plot(Pt_ancrage[i][:, 0], Pt_ancrage[i][:, 1], Pt_ancrage[i][:, 2], ".k", label="Points d'ancrage simulés")
-    ax.plot(
-        Pt[i][ind_masse[i], 0],
-        Pt[i][ind_masse[i], 1],
-        Pt[i][ind_masse[i], 2],
-        "+y",
-        label="Point optimisés le plus bas d'indice " + str(ind_masse[0]),
-    )
-    ax.plot(Pt_collecte[i][0, :], Pt_collecte[i][1, :], Pt_collecte[i][2, :], ".b", label="Points collecte")
-    label_masse = labels[i].index("t" + str(ind_masse[i]))
-    ax.plot(
-        Pt_collecte[i][0, label_masse],
-        Pt_collecte[i][1, label_masse],
-        Pt_collecte[i][2, label_masse],
-        "og",
-        label="Point collecte le plus bas " + labels[i][label_masse],
-    )
-    plt.title("Fusion optim " + str(trial_name[i]))
-    ax.set_xlabel("x (m)")
-    ax.set_ylabel("y (m)")
-    ax.set_zlabel("z (m)")
-plt.legend()
+        Pt_collecte[i] = np.array(Pt_collecte[i])  # permet de mettre pt collecte sous la bonne forme pour l'utiliser apres
+        Pt_ancrage[i] = np.array(Pt_ancrage[i])  # permet de mettre pt ancrage sous la bonne forme pour l'utiliser apres
+
+    end_main = time.time()
+    temps_min = (end_main - start_main) / 60
+
+    print("**************************************************************************")
+    print("Temps total : " + str(temps_min) + " min")
+    print("**************************************************************************")
+
+    ############################################################################################################
+    # Comparaison entre collecte et points optimisés :
+    fig = plt.figure()
+    for i in range(len(essais)):
+        ax = plt.subplot(5, 7, i + 1, projection="3d")
+        ax.set_box_aspect([1.1, 1.8, 1])
+        ax.plot(Pt[i][:, 0], Pt[i][:, 1], Pt[i][:, 2], "+r", label="Points de la toile optimisés")
+        ax.plot(Pt_ancrage[i][:, 0], Pt_ancrage[i][:, 1], Pt_ancrage[i][:, 2], ".k", label="Points d'ancrage simulés")
+        ax.plot(
+            Pt[i][ind_masse[i], 0],
+            Pt[i][ind_masse[i], 1],
+            Pt[i][ind_masse[i], 2],
+            "+y",
+            label="Point optimisés le plus bas d'indice " + str(ind_masse[0]),
+        )
+        ax.plot(Pt_collecte[i][0, :], Pt_collecte[i][1, :], Pt_collecte[i][2, :], ".b", label="Points collecte")
+        label_masse = labels[i].index("t" + str(ind_masse[i]))
+        ax.plot(
+            Pt_collecte[i][0, label_masse],
+            Pt_collecte[i][1, label_masse],
+            Pt_collecte[i][2, label_masse],
+            "og",
+            label="Point collecte le plus bas " + labels[i][label_masse],
+        )
+        plt.title("Fusion optim " + str(trial_name[i]))
+        ax.set_xlabel("x (m)")
+        ax.set_ylabel("y (m)")
+        ax.set_zlabel("z (m)")
+    plt.legend()
 
 
-# calcul de l'erreur :
-# sur la position/force
-erreur_position = []
-erreur_force = []
-for p in range(len(essais)):
-    err_pos = 0
-    err_force = 0
-    for ind in range(2 * n * m):
-        if "t" + str(ind) in labels[p]:
-            ind_collecte1 = labels[p].index("t" + str(ind))  # ATTENTION gérer les nans
+    # calcul de l'erreur :
+    # sur la position/force
+    erreur_position = []
+    erreur_force = []
+    for p in range(len(essais)):
+        err_pos = 0
+        err_force = 0
+        for ind in range(2 * n * m):
+            if "t" + str(ind) in labels[p]:
+                ind_collecte1 = labels[p].index("t" + str(ind))  # ATTENTION gérer les nans
+                for i in range(3):
+                    if np.isnan(Pt_collecte[p][i, ind_collecte1]) == False:  # gérer les nans
+                        err_pos += (Pt[p][ind, i] - Pt_collecte[p][i, ind_collecte1]) ** 2
+        erreur_position.append(err_pos)
+
+        for ind in range(n * m):
             for i in range(3):
-                if np.isnan(Pt_collecte[p][i, ind_collecte1]) == False:  # gérer les nans
-                    err_pos += (Pt[p][ind, i] - Pt_collecte[p][i, ind_collecte1]) ** 2
-    erreur_position.append(err_pos)
+                err_force += (F_point[p][ind, i]) ** 2
+        erreur_force.append(err_force)
 
-    for ind in range(n * m):
-        for i in range(3):
-            err_force += (F_point[p][ind, i]) ** 2
-    erreur_force.append(err_force)
-
-    print(
-        "-Erreur sur la position-  " + str(trial_name[p]) + " = " + str(erreur_position[p]) + " m" + " // "
-        "-Erreur sur la force-  " + str(trial_name[p]) + " = " + str(erreur_force[p]) + " N"
-    )
+        print(
+            "-Erreur sur la position-  " + str(trial_name[p]) + " = " + str(erreur_position[p]) + " m" + " // "
+            "-Erreur sur la force-  " + str(trial_name[p]) + " = " + str(erreur_force[p]) + " N"
+        )
 
 
-# ENREGISTREMENT PICKLE#
-path = "results/result_multi_essais/" + "optim_sur_35_essais_corr" + ".pkl"
-with open(path, "wb") as file:
-    pickle.dump(Solution, file)
-    pickle.dump(labels, file)
-    pickle.dump(Pt_collecte, file)
-    pickle.dump(Pt_ancrage, file)
-    pickle.dump(ind_masse, file)
-    pickle.dump(erreur_position, file)
-    pickle.dump(erreur_force, file)
-    pickle.dump(f, file)
-    pickle.dump(dict_fixed_params, file)
-    pickle.dump(trial_name, file)
+    # ENREGISTREMENT PICKLE#
+    path = "results/result_multi_essais/" + "optim_sur_35_essais_corr" + ".pkl"
+    with open(path, "wb") as file:
+        pickle.dump(Solution, file)
+        pickle.dump(labels, file)
+        pickle.dump(Pt_collecte, file)
+        pickle.dump(Pt_ancrage, file)
+        pickle.dump(ind_masse, file)
+        pickle.dump(erreur_position, file)
+        pickle.dump(erreur_force, file)
+        pickle.dump(f, file)
+        pickle.dump(dict_fixed_params, file)
+        pickle.dump(trial_name, file)
 
-plt.show()  # on affiche tous les graphes
+    plt.show()  # on affiche tous les graphes
+
+if __name__ == "__main__":
+    main()
