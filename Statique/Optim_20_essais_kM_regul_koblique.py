@@ -6,7 +6,7 @@ On considere que les parametres variables sont ;
 -les raideurs des ressorts
 -les masses des 5 points sur lesquels le disque est posé
 L'objectif :
--minimiser la résultante des forces en chacun des 135 points des 20 essais
+-minimiser la résultante des forces en chacun des n*m points des 20 essais
 -minimiser la différence entre la position des points de collecte et la position du modele
 -reguler les k obliques
 Les contraintes :
@@ -14,7 +14,7 @@ Les contraintes :
 
 L'optimisation renvoie alors :
 -la valeur des k et des 5 masses (12 k et 5*20 masses)
--les coordonnées des 135 points des 20 essais
+-les coordonnées des n*m points des 20 essais
 -le label du point sur lequel le disque est posé
 
 """
@@ -990,12 +990,12 @@ def Resultat_PF_collecte(participant, vide_name, trial_name, frame):
 def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
     """
     Interpoler lespoints manquants de la collecte pour les utiliser dans l'initial guess
-    :param Pt_collecte: DM(3,135)
+    :param Pt_collecte: DM(3,n*m)
     :param labels: list(nombre de labels)
-    :return: Pt_interpole: DM(3,135) (même dimension que Pos_repos)
+    :return: Pt_interpole: DM(3,n*m) (même dimension que Pos_repos)
     """
     # liste avec les bons points aux bons endroits, et le reste vaut 0
-    Pt_interpole = cas.DM.zeros((3, 135))
+    Pt_interpole = cas.DM.zeros((3, n*m))
     for ind in range(135):
         if "t" + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index("t" + str(ind))]) == False:
             Pt_interpole[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]
@@ -1052,7 +1052,7 @@ def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
 def list2tab(list):
     """
     Transformer un MX de taille 405x1 en MX de taille 135x3
-    :param list: MX(405,1)
+    :param list: MX(n*m*3,1)
     :return: tab: MX(135,3)
     """
     tab = cas.MX.zeros(135, 3)

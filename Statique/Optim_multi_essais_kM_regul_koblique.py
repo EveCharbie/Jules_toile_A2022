@@ -6,7 +6,7 @@ On considere que les parametres variables sont ;
 -les raideurs des ressorts
 -les masses des 5 points sur lesquels le disque est posé
 L'objectif :
--minimiser la résultante des forces en chacun des 135 points des 35 essais
+-minimiser la résultante des forces en chacun des n*m points des 35 essais
 -minimiser la différence entre la position des points de collecte et la position du modele des 35 essais
 -reguler les k obliques
 
@@ -15,7 +15,7 @@ Les contraintes :
 
 L'optimisation renvoie alors :
 -la valeur des k et des 5 masses
--les coordonnées des 135 points des 35 essais
+-les coordonnées des n*m points des 35 essais
 -le label du point sur lequel le disque est posé
 
 """
@@ -98,12 +98,12 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
     Returns the bounds on the position of the points of the model based on the interpolation of the missing points.
     """
 
-    if isinstance(initial_guess, InitialGuessType.LINEAR_INTERPOLATION):
+    if initial_guess == InitialGuessType.LINEAR_INTERPOLATION:
         Pt_interpolated = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
-    elif isinstance(initial_guess, InitialGuessType.RESTING_POSITION):
+    elif initial_guess == InitialGuessType.RESTING_POSITION:
         Pt_interpolated = Pt_repos
-    elif isinstance(initial_guess, InitialGuessType.SURFACE_INTERPOLATION):
-        Pt_interpolated = surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
+    elif initial_guess == InitialGuessType.SURFACE_INTERPOLATION:
+        Pt_interpolated = surface_interpolation_collecte([Pt_collecte], [Pt_ancrage], Pt_repos, Pt_ancrage_repos, [labels])[0, :, :].T
     else:
         raise RuntimeError(f"The interpolation type of the initial guess {initial_guess} is not recognized.")
 
@@ -112,7 +112,7 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
     ubw_Pt = []
     w0_Pt = []
 
-    for k in range(405):
+    for k in range(n*m*3):
         if k % 3 == 0:  # limites et guess en x
             lbw_Pt += [Pt_interpolated[0, int(k // 3)] - 0.3]
             ubw_Pt += [Pt_interpolated[0, int(k // 3)] + 0.3]
@@ -159,7 +159,7 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
 
         # NLP VALUES
         Ma = cas.MX.sym("Ma", 5)
-        X = cas.MX.sym("X", 135 * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
+        X = cas.MX.sym("X", n*m * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
 
         # Ma
         w0_m, lbw_m, ubw_m = m_bounds(masse_essai)
@@ -312,47 +312,47 @@ def main():
 
     # Masses#
     for i in range(0, 9):  # nombre essais centrefront
-        M_centrefront.append(np.array(Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i]))
+        M_centrefront.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
     for i in range(0, 9):
         print("M_centrefront_" + str(i) + " = " + str(M_centrefront[i]))
 
     for i in range(9, 18):  # nb essais statique : 9
-        M_statique.append(np.array(Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i]))
+        M_statique.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
     for i in range(0, 9):
         print("M_statique_" + str(i) + " = " + str(M_statique[i]))
 
     for i in range(18, 27):  # nb essais leftfront: 9
-        M_leftfront.append(np.array(Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i]))
+        M_leftfront.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
     for i in range(0, 9):
         print("M_leftfront_" + str(i) + " = " + str(M_leftfront[i]))
 
     for i in range(27, 36):  # nb essais left: 9
-        M_left.append(np.array(Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i]))
+        M_left.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
     for i in range(0, 9):
         print("M_left_" + str(i) + " = " + str(M_left[i]))
 
     # Points#
     ###centrefront###
     for i in range(0, 9):
-        Pt_centrefront.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
+        Pt_centrefront.append(np.reshape(Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i], (n*m, 3)))
         F_totale_centrefront.append(
             Calcul_Pt_F(
-                Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],
+                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i],
+                Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
             )[0]
         )
         F_point_centrefront.append(
             Calcul_Pt_F(
-                Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],
+                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i],
+                Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
             )[1]
         )
 
@@ -364,25 +364,25 @@ def main():
         Pt_ancrage_centrefront.append(np.array(Pt_ancrage[i]))
     ###statique###
     for i in range(9, 18):
-        Pt_statique.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
+        Pt_statique.append(np.reshape(Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i], (n*m, 3)))
         F_totale_statique.append(
             Calcul_Pt_F(
-                Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],
+                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i],
+                Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
             )[0]
         )
         F_point_statique.append(
             Calcul_Pt_F(
-                Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],
+                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i],
+                Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
             )[1]
         )
 
@@ -394,25 +394,25 @@ def main():
         Pt_ancrage_statique.append(np.array(Pt_ancrage[i]))
     ###leftfront###
     for i in range(18, 27):
-        Pt_leftfront.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
+        Pt_leftfront.append(np.reshape(Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i], (n*m, 3)))
         F_totale_leftfront.append(
             Calcul_Pt_F(
-                Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],
+                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i],
+                Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
             )[0]
         )
         F_point_leftfront.append(
             Calcul_Pt_F(
-                Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],
+                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i],
+                Solution[12 + n*m*3 * i + 5 * i : 17 + 405 * i + 5 * i],
             )[1]
         )
 
@@ -424,7 +424,7 @@ def main():
         Pt_ancrage_leftfront.append(np.array(Pt_ancrage[i]))
     ###left###
     for i in range(27, 36):
-        Pt_left.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
+        Pt_left.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (n*m, 3)))
         F_totale_left.append(
             Calcul_Pt_F(
                 Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],

@@ -145,16 +145,16 @@ def Force_totale_points(X, Xdot, C, F, ind_masse):
     return F_tot
 
 def tab2list(tab):
-    list = cas.MX.zeros(135 * 3)
-    for i in range(135):
+    list = cas.MX.zeros(n*m * 3)
+    for i in range(n*m):
         for j in range(3):
             list[j + 3 * i] = tab[i, j]
     return list
 
 
 def list2tab(list):
-    tab = cas.MX.zeros(135, 3)
-    for ind in range(135):
+    tab = cas.MX.zeros(n*m, 3)
+    for ind in range(n*m):
         for i in range(3):
             tab[ind, i] = list[i + 3 * ind]
     return tab
@@ -301,7 +301,7 @@ def Optimisation():  # main
 
         Pt_inter = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
 
-        for k in range(405):
+        for k in range(n*m*3):
             if k % 3 == 0:  # limites et guess en x
                 lbw_Pt += [Pt_inter[0, int(k // 3)] - 0.3]
                 ubw_Pt += [Pt_inter[0, int(k // 3)] + 0.3]
@@ -331,8 +331,8 @@ def Optimisation():  # main
         :return: bound et init pour les vitesses en i
         """
 
-        lbw_v = [-30] * 405
-        ubw_v = [30] * 405
+        lbw_v = [-30] * n*m*3
+        ubw_v = [30] * n*m*3
 
         position_imoins1 = interpolation_collecte_nan(Ptavant, labels)
         position_iplus1 = interpolation_collecte_nan(Ptapres, labels)
@@ -341,11 +341,11 @@ def Optimisation():  # main
         vitesse_initiale = vitesse_initiale.T
 
         w0_v = []
-        for i in range(135):
+        for i in range(n*m):
             for j in range(3):
                 w0_v.append(vitesse_initiale[i, j])
 
-        w0_v = [1] * 405
+        w0_v = [1] * n*m*3
 
         return lbw_v, ubw_v, w0_v
 
@@ -484,8 +484,8 @@ def Optimisation():  # main
     ubw += ubw_C
     w0 += w0_C
 
-    X_sym = cas.MX.sym("X_0", 135 * 3)
-    Xdot_sym = cas.MX.sym("Xdot_0", 135 * 3)
+    X_sym = cas.MX.sym("X_0", n*m * 3)
+    Xdot_sym = cas.MX.sym("Xdot_0", n*m * 3)
     F_sym = cas.MX.sym("force_0", 5 * 3)
 
     lbw_X, ubw_X, w0_X = Pt_bounds(X_sym, Pt_collecte_tab[1], Pt_ancrage, labels)
@@ -538,8 +538,8 @@ def Optimisation():  # main
         Pt_integres, V_integrees = Integration(X_sym, Xdot_sym, F_sym, C_sym, Masse_centre, ind_masse)
 
         # -- definition des nouvelles variables symboliques a l'instant i+1
-        X_sym = cas.MX.sym(f"X_{frame}", 135 * 3)
-        Xdot_sym = cas.MX.sym(f"Xdot_{frame}", 135 * 3)
+        X_sym = cas.MX.sym(f"X_{frame}", n*m * 3)
+        Xdot_sym = cas.MX.sym(f"Xdot_{frame}", n*m * 3)
         F_sym = cas.MX.sym(f"force_{frame}", 5 * 3)
 
         lbw_X, ubw_X, w0_X = Pt_bounds(X_sym, Pt_collecte_tab[frame + 1], Pt_ancrage, labels)
@@ -571,8 +571,8 @@ def Optimisation():  # main
             for j in range(3):
                 g += [Pt_integres[i, j] - X_sym[j::3][i]]
                 g += [V_integrees[i, j] - Xdot_sym[j::3][i]]
-        lbg += [0] * (135 * 3 * 2)
-        ubg += [0] * (135 * 3 * 2)
+        lbg += [0] * (n*m * 3 * 2)
+        ubg += [0] * (n*m * 3 * 2)
 
     # -- Creation du solver
     prob = {"f": objectif, "x": cas.vertcat(*w), "g": cas.vertcat(*g)}

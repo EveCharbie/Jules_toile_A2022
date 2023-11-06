@@ -7,10 +7,10 @@ Then the K are optimized to match all the trials at once.
 Optimization variables:
     - K (elasticity coefficients)
     - M (applied mass on the 5 points of the trampoline bed)
-    - X (position of the 135 points of the trampoline bed)
+    - X (position of the n*m points of the trampoline bed)
 
 Objectives:
-    - Minimize the forces on the 135 points of the trampoline bed
+    - Minimize the forces on the n*m points of the trampoline bed
     - Minimize the difference between the position of the points and the model
     - Regularization of the diagonal springs (redondant model)
 
@@ -987,7 +987,7 @@ def Resultat_PF_collecte(participant, empty_trial_name, trial_name, frame):
 def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
     """
     Interpoler lespoints manquants de la collecte pour les utiliser dans l'initial guess
-    :param Pt_collecte: DM(3,135)
+    :param Pt_collecte: DM(3,n*m)
     :param labels: list(nombre de labels)
     :return: Pt_interpole: DM(3,135) (même dimension que Pos_repos)
     """
@@ -1034,7 +1034,7 @@ def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
 def list2tab(list):
     """
     Transformer un MX de taille 405x1 en MX de taille 135x3
-    :param list: MX(405,1)
+    :param list: MX(n*m*3,1)
     :return: tab: MX(135,3)
     """
     tab = cas.MX.zeros(135, 3)
@@ -1104,10 +1104,13 @@ def a_minimiser(
                 else:
                     Difference += (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
 
-    regul_k = K[8] ** 2 + K[9] ** 2 + K[10] ** 2 + K[11] ** 2
-
-    output = (1e4) * Difference + (1e-6) * regul_k
-    obj = cas.Function("f", [X, K, Ma], [output]).expand()
+    if type(K, cas.MX):
+        regul_k = K[8] ** 2 + K[9] ** 2 + K[10] ** 2 + K[11] ** 2
+        output = (1e4) * Difference + (1e-6) * regul_k
+        obj = cas.Function("f", [X, K, Ma], [output]).expand()
+    else:
+        output = (1e4) * Difference
+        obj = cas.Function("f", [X, Ma], [output]).expand()
 
     return obj
 
@@ -1151,7 +1154,6 @@ def get_list_results_static(participant, trial_name, frame, dict_fixed_params):
 
     return F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage
 
-def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params):
     def k_bounds():
 
         k1 = 3381.540529105023  # un type de coin (ressort horizontal)
@@ -1212,7 +1214,7 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
         ubw_Pt = []
         w0_Pt = []
 
-        for k in range(405):
+        for k in range(n*m*3):
             if k % 3 == 0:  # limites et guess en x
                 lbw_Pt += [Pt_interpolated[0, int(k // 3)] - 0.3]
                 ubw_Pt += [Pt_interpolated[0, int(k // 3)] + 0.3]
@@ -1228,9 +1230,12 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
 
         return w0_Pt, lbw_Pt, ubw_Pt
 
+def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_paramss):
+
     # PARAM FIXES
     n = 15
     m = 9
+    Pt_ancrage_repos, Pt_repos = Points_ancrage_repos(dict_fixed_paramss)
 
     # OPTIMISATION :
     # Start with an empty NLP
@@ -1442,7 +1447,7 @@ def main():
     F_point = []
 
     for i in range(len(essais)):
-        M.append(np.array(Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i]))
+        M.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + 405 * i + 5 * i]))
         Pt.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
 
         F_totale.append(

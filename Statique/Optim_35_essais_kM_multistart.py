@@ -7,7 +7,7 @@ On considere que les parametres variables sont ;
 -les raideurs des ressorts
 -les masses des 5 points sur lesquels le disque est posé
 L'objectif :
--minimiser la résultante des forces en chacun des 135 points des 35 essais
+-minimiser la résultante des forces en chacun des n*m points des 35 essais
 -minimiser la différence entre la position des points de collecte et la position du modele des 35 essais
 -reguler les k obliques
 
@@ -16,7 +16,7 @@ Les contraintes :
 
 L'optimisation renvoie alors :
 -la valeur des k et des 5 masses
--les coordonnées des 135 points des 35 essais
+-les coordonnées des n*m points des 35 essais
 -le label du point sur lequel le disque est posé
 
 """
@@ -991,13 +991,13 @@ def Resultat_PF_collecte(participant, vide_name, trial_name, frame):
 def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
     """
     Interpoler lespoints manquants de la collecte pour les utiliser dans l'initial guess
-    :param Pt_collecte: DM(3,135)
+    :param Pt_collecte: DM(3,n*m)
     :param labels: list(nombre de labels)
-    :return: Pt_interpole: DM(3,135) (même dimension que Pos_repos)
+    :return: Pt_interpole: DM(3,n*m) (même dimension que Pos_repos)
     """
     # liste avec les bons points aux bons endroits, et le reste vaut 0
-    Pt_interpole = cas.DM.zeros((3, 135))
-    for ind in range(135):
+    Pt_interpole = cas.DM.zeros((3, n*m))
+    for ind in range(n*m):
         if "t" + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index("t" + str(ind))]) == False:
             Pt_interpole[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]
 
@@ -1038,7 +1038,7 @@ def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
 def list2tab(list):
     """
     Transformer un MX de taille 405x1 en MX de taille 135x3
-    :param list: MX(405,1)
+    :param list: MX(n*m*3,1)
     :return: tab: MX(135,3)
     """
     tab = cas.MX.zeros(135, 3)
@@ -1191,7 +1191,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
         ubw_Pt = []
         w0_Pt = []
 
-        for k in range(405):
+        for k in range(n*m*3):
             if k % 3 == 0:  # limites et guess en x
                 lbw_Pt += [Pt_inter[0, int(k // 3)] - 0.3]
                 ubw_Pt += [Pt_inter[0, int(k // 3)] + 0.3]
@@ -1218,7 +1218,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
         ubw_Pt = []
         w0_Pt = []
 
-        for k in range(405):
+        for k in range(n*m*3):
             if k % 3 == 0:  # limites et guess en x
                 lbw_Pt += [Pos[int(k // 3), 0] - 0.3]
                 ubw_Pt += [Pos[int(k // 3), 0] + 0.3]
@@ -1535,8 +1535,8 @@ for multi in range(0, nb_essais_multi):
     F_point = []
 
     for i in range(len(essais)):
-        M.append(np.array(Solution[12 + 405 * i + 5 * i : 17 + 405 * i + 5 * i]))
-        Pt.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
+        M.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
+        Pt.append(np.reshape(Solution[17 + n*m*3 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
 
         F_totale.append(
             Calcul_Pt_F(

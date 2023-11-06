@@ -861,16 +861,16 @@ def rotation_points(Pos_repos, Pt_ancrage):
 
 
 def tab2list(tab):
-    list = np.zeros(135 * 3)
-    for i in range(135):
+    list = np.zeros(n*m * 3)
+    for i in range(n*m):
         for j in range(3):
             list[j + 3 * i] = tab[i, j]
     return list
 
 
 def list2tab(list):
-    tab = np.zeros(135, 3)
-    for ind in range(135):
+    tab = np.zeros(n*m, 3)
+    for ind in range(n*m):
         for i in range(3):
             tab[ind, i] = list[i + 3 * ind]
     return tab
@@ -879,14 +879,14 @@ def list2tab(list):
 def interpolation_collecte(Pt_collecte, labels):
     """
     Interpoler lespoints manquants de la collecte pour les utiliser dans l'initial guess
-    :param Pt_collecte: DM(3,135)
+    :param Pt_collecte: DM(3,n*m)
     :param labels: list(nombre de labels)
-    :return: Pt_interpole: DM(3,135) (même dimension que Pos_repos)
+    :return: Pt_interpole: DM(3,n*m) (même dimension que Pos_repos)
     """
     # liste avec les bons points aux bons endroits, et le reste vaut 0
-    Pt_interpole = np.zeros((3, 135))
+    Pt_interpole = np.zeros((3, n*m))
     Pt_interpole[:] = np.nan  # on met des Nan partout
-    for ind in range(135):
+    for ind in range(n*m):
         if "t" + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index("t" + str(ind))]) == False:
             Pt_interpole[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]
 
@@ -896,14 +896,14 @@ def interpolation_collecte(Pt_collecte, labels):
 def interpolation_collecte_lineaire(Pt_collecte, Pt_ancrage, labels):
     """
     Interpoler lespoints manquants de la collecte pour les utiliser dans l'initial guess
-    :param Pt_collecte: DM(3,135)
+    :param Pt_collecte: DM(3,n*m)
     :param labels: list(nombre de labels)
-    :return: Pt_interpole: DM(3,135) (même dimension que Pos_repos)
+    :return: Pt_interpole: DM(3,n*m) (même dimension que Pos_repos)
     """
     # liste avec les bons points aux bons endroits, et le reste vaut 0
 
-    Pt_interpole = np.zeros((3, 135))
-    for ind in range(135):
+    Pt_interpole = np.zeros((3, n*m))
+    for ind in range(n*m):
         if "t" + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index("t" + str(ind))]) == False:
             Pt_interpole[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]
 
@@ -1475,16 +1475,16 @@ plt.title("Reparition des C")
 plt.show()
 C_init = w0[:40]
 
-position1 = solution[40:445].reshape((135, 3))
-vitesse1 = solution[445:850].reshape((135, 3))
+position1 = solution[40:445].reshape((n*m, 3))
+vitesse1 = solution[445:850].reshape((n*m, 3))
 force1 = solution[850:865].reshape((5, 3))
 
-position2 = solution[865:1270].reshape((135, 3))
-vitesse2 = solution[1270:1675].reshape((135, 3))
+position2 = solution[865:1270].reshape((n*m, 3))
+vitesse2 = solution[1270:1675].reshape((n*m, 3))
 force2 = solution[1675:1690].reshape((5, 3))
 
-pos1init = np.array(w0[40:445]).reshape((135, 3))
-pos2init = np.array(w0[865:1270]).reshape((135, 3))
+pos1init = np.array(w0[40:445]).reshape((n*m, 3))
+pos2init = np.array(w0[865:1270]).reshape((n*m, 3))
 
 
 # -- positions -- #
