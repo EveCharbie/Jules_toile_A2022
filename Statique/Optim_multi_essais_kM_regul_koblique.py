@@ -50,81 +50,86 @@ Nb_ressorts_croix = 2 * (m - 1) * (n - 1)  # nombre de ressorts obliques dans la
 Nb_ressorts_horz = n * (m - 1)  # nombre de ressorts horizontaux dans la toile (pas dans le cadre)
 Nb_ressorts_vert = m * (n - 1)  # nombre de ressorts verticaux dans la toile (pas dans le cadre)
 
-def Optimisation(        F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params):
-    def k_bounds():
-        k1 = 71141.43138667523  # un type de coin (ressort horizontal)
-        k2 = 49736.39530405858  # ressorts horizontaux du bord (bord vertical) : relient le cadre et la toile
-        k3 = 32719.304620783536  # un type de coin (ressort vertical)
-        k4 = 55555.8880837324  # ressorts verticaux du bord (bord horizontal) : relient le cadre et la toile
-        k5 = 206089.58358212537  # ressorts horizontaux du bord horizontal de la toile
-        k6 = 172374.60990475505  # ressorts horizontaux
-        k7 = 130616.02962104743  # ressorts verticaux du bord vertical de la toile
-        k8 = 262394.061698019  # ressorts verticaux
-        # VALEURS INVENTÉES :
-        k_oblique1 = 171417.87643722596  # 4 ressorts des coins
-        k_oblique2 = 143529.8253725852  # ressorts des bords verticaux
-        k_oblique3 = 200282.72442280647  # ressorts des bords horizontaux
-        k_oblique4 = 395528.32183421426  # ressorts obliques quelconques
-        k_croix = 3000  # je sais pas
 
-        w0_k = [k1, k2, k3, k4, k5, k6, k7, k8, k_oblique1, k_oblique2, k_oblique3, k_oblique4]
-        for i in range(len(w0_k)):
-            w0_k[i] = 1 * w0_k[i]
+def k_bounds():
+    k1 = 71141.43138667523  # un type de coin (ressort horizontal)
+    k2 = 49736.39530405858  # ressorts horizontaux du bord (bord vertical) : relient le cadre et la toile
+    k3 = 32719.304620783536  # un type de coin (ressort vertical)
+    k4 = 55555.8880837324  # ressorts verticaux du bord (bord horizontal) : relient le cadre et la toile
+    k5 = 206089.58358212537  # ressorts horizontaux du bord horizontal de la toile
+    k6 = 172374.60990475505  # ressorts horizontaux
+    k7 = 130616.02962104743  # ressorts verticaux du bord vertical de la toile
+    k8 = 262394.061698019  # ressorts verticaux
+    # VALEURS INVENTÉES :
+    k_oblique1 = 171417.87643722596  # 4 ressorts des coins
+    k_oblique2 = 143529.8253725852  # ressorts des bords verticaux
+    k_oblique3 = 200282.72442280647  # ressorts des bords horizontaux
+    k_oblique4 = 395528.32183421426  # ressorts obliques quelconques
+    k_croix = 3000  # je sais pas
 
-        lbw_k = [1e-4] * 12
-        ubw_k = [1e7] * 12  # bornes très larges
+    w0_k = [k1, k2, k3, k4, k5, k6, k7, k8, k_oblique1, k_oblique2, k_oblique3, k_oblique4]
+    for i in range(len(w0_k)):
+        w0_k[i] = 1 * w0_k[i]
 
-        return w0_k, lbw_k, ubw_k
+    lbw_k = [1e-4] * 12
+    ubw_k = [1e7] * 12  # bornes très larges
 
-    def m_bounds(masse_essai):
-        lbw_m, ubw_m = [], []
+    return w0_k, lbw_k, ubw_k
 
-        M1 = masse_essai / 5  # masse centre
-        M2 = masse_essai / 5  # masse centre +1
-        M3 = masse_essai / 5  # masse centre -1
-        M4 = masse_essai / 5  # masse centre +15
-        M5 = masse_essai / 5  # masse centre -15
 
-        w0_m = [M1, M2, M3, M4, M5]
-        lbw_m += [0.6 * masse_essai / 5] * 5  # diff here
-        ubw_m += [1.4 * masse_essai / 5] * 5  # diff here
+def m_bounds(masse_essai):
+    lbw_m, ubw_m = [], []
 
-        return w0_m, lbw_m, ubw_m
+    M1 = masse_essai / 5  # masse centre
+    M2 = masse_essai / 5  # masse centre +1
+    M3 = masse_essai / 5  # masse centre -1
+    M4 = masse_essai / 5  # masse centre +15
+    M5 = masse_essai / 5  # masse centre -15
 
-    def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
-        """
-        Returns the bounds on the position of the points of the model based on the interpolation of the missing points.
-        """
+    w0_m = [M1, M2, M3, M4, M5]
+    lbw_m += [0.6 * masse_essai / 5] * 5  # diff here
+    ubw_m += [1.4 * masse_essai / 5] * 5  # diff here
 
-        if isinstance(initial_guess, InitialGuessType.LINEAR_INTERPOLATION):
-            Pt_interpolated = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
-        elif isinstance(initial_guess, InitialGuessType.RESTING_POSITION):
-            Pt_interpolated = Pt_repos
-        elif isinstance(initial_guess, InitialGuessType.SURFACE_INTERPOLATION):
-            Pt_interpolated = surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
-        else:
-            raise RuntimeError(f"The interpolation type of the initial guess {initial_guess} is not recognized.")
+    return w0_m, lbw_m, ubw_m
 
-        # bounds and initial guess
-        lbw_Pt = []
-        ubw_Pt = []
-        w0_Pt = []
 
-        for k in range(405):
-            if k % 3 == 0:  # limites et guess en x
-                lbw_Pt += [Pt_interpolated[0, int(k // 3)] - 0.3]
-                ubw_Pt += [Pt_interpolated[0, int(k // 3)] + 0.3]
-                w0_Pt += [Pt_interpolated[0, int(k // 3)]]
-            if k % 3 == 1:  # limites et guess en y
-                lbw_Pt += [Pt_interpolated[1, int(k // 3)] - 0.3]
-                ubw_Pt += [Pt_interpolated[1, int(k // 3)] + 0.3]
-                w0_Pt += [Pt_interpolated[1, int(k // 3)]]
-            if k % 3 == 2:  # limites et guess en z
-                lbw_Pt += [-2]
-                ubw_Pt += [0.5]
-                w0_Pt += [Pt_interpolated[2, int(k // 3)]]
+def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
+    """
+    Returns the bounds on the position of the points of the model based on the interpolation of the missing points.
+    """
 
-        return w0_Pt, lbw_Pt, ubw_Pt
+    if isinstance(initial_guess, InitialGuessType.LINEAR_INTERPOLATION):
+        Pt_interpolated = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
+    elif isinstance(initial_guess, InitialGuessType.RESTING_POSITION):
+        Pt_interpolated = Pt_repos
+    elif isinstance(initial_guess, InitialGuessType.SURFACE_INTERPOLATION):
+        Pt_interpolated = surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
+    else:
+        raise RuntimeError(f"The interpolation type of the initial guess {initial_guess} is not recognized.")
+
+    # bounds and initial guess
+    lbw_Pt = []
+    ubw_Pt = []
+    w0_Pt = []
+
+    for k in range(405):
+        if k % 3 == 0:  # limites et guess en x
+            lbw_Pt += [Pt_interpolated[0, int(k // 3)] - 0.3]
+            ubw_Pt += [Pt_interpolated[0, int(k // 3)] + 0.3]
+            w0_Pt += [Pt_interpolated[0, int(k // 3)]]
+        if k % 3 == 1:  # limites et guess en y
+            lbw_Pt += [Pt_interpolated[1, int(k // 3)] - 0.3]
+            ubw_Pt += [Pt_interpolated[1, int(k // 3)] + 0.3]
+            w0_Pt += [Pt_interpolated[1, int(k // 3)]]
+        if k % 3 == 2:  # limites et guess en z
+            lbw_Pt += [-2]
+            ubw_Pt += [0.5]
+            w0_Pt += [Pt_interpolated[2, int(k // 3)]]
+
+    return w0_Pt, lbw_Pt, ubw_Pt
+
+
+def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params):
 
     # PARAM FIXES
     n = 15
@@ -206,6 +211,7 @@ def Optimisation(        F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_a
 ##########################################################################################################################
 
 def main():
+
     initial_guess = InitialGuessType.RESTING_POSITION  ### to be tested with SURFACE_INTERPOLATION
     optimize_static_mass = True
 
