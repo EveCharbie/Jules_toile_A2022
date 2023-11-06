@@ -978,8 +978,8 @@ def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
     :return: Pt_interpole: DM(3,n*m) (même dimension que Pos_repos)
     """
     # liste avec les bons points aux bons endroits, et le reste vaut 0
-    Pt_interpole = cas.DM.zeros((3, n*m))
-    for ind in range(n*m):
+    Pt_interpole = cas.DM.zeros((3, n * m))
+    for ind in range(n * m):
         if "t" + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index("t" + str(ind))]) == False:
             Pt_interpole[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]
 
@@ -1038,16 +1038,16 @@ def list2tab(list):
     :param list: MX(n*m*3,1)
     :return: tab: MX(n*m,3)
     """
-    tab = cas.MX.zeros(n*m, 3)
-    for ind in range(n*m):
+    tab = cas.MX.zeros(n * m, 3)
+    for ind in range(n * m):
         for i in range(3):
             tab[ind, i] = list[i + 3 * ind]
     return tab
 
 
 def tab2list(tab):
-    list = cas.MX.zeros(n*m * 3)
-    for i in range(n*m):
+    list = cas.MX.zeros(n * m * 3)
+    for i in range(n * m):
         for j in range(3):
             list[j + 3 * i] = tab[i, j]
     return list
@@ -1056,7 +1056,7 @@ def tab2list(tab):
 def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
     k, k_croix = Param_variable(K)
     M = Param_variable_masse(ind_masse, Ma)
-    Pt = list2tab(X[: n*m * 3])
+    Pt = list2tab(X[: n * m * 3])
 
     Spring_bout_1, Spring_bout_2 = Spring_bouts(Pt, Pt_ancrage)
     Spring_bout_croix_1, Spring_bout_croix_2 = Spring_bouts_croix(Pt)
@@ -1231,17 +1231,17 @@ F_totale = []
 F_point = []
 
 for i in range(0, nb_essais):
-    M.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
-    Pt.append(np.reshape(Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i], (135, 3)))
+    M.append(np.array(Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i]))
+    Pt.append(np.reshape(Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i], (135, 3)))
 
     F_totale.append(
         Calcul_Pt_F_verif(
-            Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
+            Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i],
             Pt_ancrage[i],
             dict_fixed_params,
             k,
             ind_masse[i],
-            Solution[12 + n*m*3 * i + 5 * i : 17 + 405 * i + 5 * i],
+            Solution[12 + n * m * 3 * i + 5 * i : 17 + 405 * i + 5 * i],
         )[0]
     )
     F_point.append(

@@ -1211,7 +1211,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
         ubw_Pt = []
         w0_Pt = []
 
-        for k in range(n*m*3):
+        for k in range(n * m * 3):
             if k % 3 == 0:  # limites et guess en x
                 lbw_Pt += [Pt_inter[0, int(k // 3)] - 0.3]
                 ubw_Pt += [Pt_inter[0, int(k // 3)] + 0.3]
@@ -1238,7 +1238,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
         ubw_Pt = []
         w0_Pt = []
 
-        for k in range(n*m*3):
+        for k in range(n * m * 3):
             if k % 3 == 0:  # limites et guess en x
                 lbw_Pt += [Pos[int(k // 3), 0] - 0.3]
                 ubw_Pt += [Pos[int(k // 3), 0] + 0.3]
@@ -1427,8 +1427,8 @@ F_totale = []
 F_point = []
 
 for i in range(0, 10):
-    M.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
-    Pt.append(np.reshape(Solution[17 + n*m*3 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
+    M.append(np.array(Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i]))
+    Pt.append(np.reshape(Solution[17 + n * m * 3 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
 
     F_totale.append(
         Calcul_Pt_F(

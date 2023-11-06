@@ -1147,25 +1147,25 @@ Pt_ancrage_left = []
 # Points#
 ###centrefront###
 for i in range(0, 11):
-    Pt_centrefront.append(np.reshape(Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i], (135, 3)))
+    Pt_centrefront.append(np.reshape(Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i], (135, 3)))
     F_totale_centrefront.append(
         Calcul_Pt_F_verif(
-            Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
+            Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i],
             Pt_ancrage[i],
             dict_fixed_params,
             Solution[:12],
             ind_masse[i],
-            Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
+            Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i],
         )[0]
     )
     F_point_centrefront.append(
         Calcul_Pt_F_verif(
-            Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
+            Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i],
             Pt_ancrage[i],
             dict_fixed_params,
             Solution[:12],
             ind_masse[i],
-            Solution[12 + n*m*3 * i + 5 * i : 17 + 405 * i + 5 * i],
+            Solution[12 + n * m * 3 * i + 5 * i : 17 + 405 * i + 5 * i],
         )[1]
     )
 

@@ -31,8 +31,10 @@ from scipy.interpolate import interp1d
 import pickle
 
 import sys
+
 sys.path.append("../")
 from enums import InitialGuessType
+
 sys.path.append("../Dynamique/")
 from modele_dynamique_nxm_DimensionsReelles import surface_interpolation_collecte
 
@@ -45,6 +47,7 @@ Nb_ressorts_cadre = 2 * n + 2 * m  # nombre de ressorts entre le cadre et la toi
 Nb_ressorts_croix = 2 * (m - 1) * (n - 1)  # nombre de ressorts obliques dans la toile
 Nb_ressorts_horz = n * (m - 1)  # nombre de ressorts horizontaux dans la toile (pas dans le cadre)
 Nb_ressorts_vert = m * (n - 1)  # nombre de ressorts verticaux dans la toile (pas dans le cadre)
+
 
 # FONCTIONS AVEC LES PARAMÈTRES FIXES :
 def Param_fixe():
@@ -1075,16 +1078,13 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, optimize_sta
     return F_totale, F_point
 
 
-def a_minimiser(
-    X, K, Ma, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, ind_masse, optimize_static_mass
-):
+def a_minimiser(X, K, Ma, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, ind_masse, optimize_static_mass):
     F_totale, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, optimize_static_mass)
     Pt = list2tab(X)
     Pt_inter = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
 
     Difference = cas.MX.zeros(1)
     for i in range(3):
-
         for ind in range(n * m):
             Difference += (F_point[ind, i]) ** 2
             if "t" + str(ind) in labels:
@@ -1133,7 +1133,6 @@ def longueur_ressort(dict_fixed_params, Pt, Pt_ancrage):
 
 
 def get_list_results_static(participant, trial_name, frame, dict_fixed_params):
-
     F_totale_collecte = []
     Pt_collecte = []
     ind_masse = []
@@ -1155,7 +1154,6 @@ def get_list_results_static(participant, trial_name, frame, dict_fixed_params):
     return F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage
 
     def k_bounds():
-
         k1 = 3381.540529105023  # un type de coin (ressort horizontal)
         k2 = 4094.5093125505978  # ressorts horizontaux du bord (bord vertical) : relient le cadre et la toile
         k3 = 682.2755546467131  # un type de coin (ressort vertical)
@@ -1180,7 +1178,6 @@ def get_list_results_static(participant, trial_name, frame, dict_fixed_params):
         return w0_k, lbw_k, ubw_k
 
     def m_bounds(masse_essai):
-
         lbw_m, ubw_m = [], []
 
         M1 = masse_essai / 5  # masse centre
@@ -1205,7 +1202,9 @@ def get_list_results_static(participant, trial_name, frame, dict_fixed_params):
         elif isinstance(initial_guess, InitialGuessType.RESTING_POSITION):
             Pt_interpolated = Pt_repos
         elif isinstance(initial_guess, InitialGuessType.SURFACE_INTERPOLATION):
-            Pt_interpolated = surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
+            Pt_interpolated = surface_interpolation_collecte(
+                Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels
+            )
         else:
             raise RuntimeError(f"The interpolation type of the initial guess {initial_guess} is not recognized.")
 
@@ -1214,7 +1213,7 @@ def get_list_results_static(participant, trial_name, frame, dict_fixed_params):
         ubw_Pt = []
         w0_Pt = []
 
-        for k in range(n*m*3):
+        for k in range(n * m * 3):
             if k % 3 == 0:  # limites et guess en x
                 lbw_Pt += [Pt_interpolated[0, int(k // 3)] - 0.3]
                 ubw_Pt += [Pt_interpolated[0, int(k // 3)] + 0.3]
@@ -1230,8 +1229,19 @@ def get_list_results_static(participant, trial_name, frame, dict_fixed_params):
 
         return w0_Pt, lbw_Pt, ubw_Pt
 
-def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_paramss):
 
+def Optimisation(
+    F_totale_collecte,
+    Pt_collecte,
+    labels,
+    ind_masse,
+    Pt_ancrage,
+    Masse_centre,
+    trial_name,
+    initial_guess,
+    optimize_static_mass,
+    dict_fixed_paramss,
+):
     # PARAM FIXES
     n = 15
     m = 9
@@ -1271,7 +1281,9 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
         w += [Ma]
 
         # X
-        w0_Pt, lbw_Pt, ubw_Pt = Pt_bounds(initial_guess, Pt_collecte[i], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels[i])
+        w0_Pt, lbw_Pt, ubw_Pt = Pt_bounds(
+            initial_guess, Pt_collecte[i], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels[i]
+        )
         lbw += lbw_Pt
         ubw += ubw_Pt
         w0 += w0_Pt
@@ -1312,13 +1324,48 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
 
 ##########################################################################################################################
 def main():
-
     initial_guess = InitialGuessType.RESTING_POSITION  ### to be tested with SURFACE_INTERPOLATION
     optimize_static_mass = True
 
     # Liste des deux essais a optimiser
     essais = []
-    participants = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    participants = [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+    ]
     nb_disques = [
         2,
         3,
@@ -1399,7 +1446,6 @@ def main():
     essais += ["labeled_statique_D" + str(nb_disques[33])]
     essais += ["labeled_statique_leftfront_D" + str(nb_disques[34])]
 
-
     participant = []  # creation d une liste pour gerer les participants
     trial_name = []  # creation d une liste pour gerer les essais
     empty_trial_name = [
@@ -1429,14 +1475,25 @@ def main():
             print("masse appliquée pour " + str(nb_disques[i]) + " disques = " + str(Masse_centre[i]) + " kg")
 
     dict_fixed_params = Param_fixe()
-    F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage = get_list_results_static(participant, trial_name, frame, dict_fixed_params)
+    F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage = get_list_results_static(
+        participant, trial_name, frame, dict_fixed_params
+    )
 
     ########################################################################################################################
 
     start_main = time.time()
 
     Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f = Optimisation(
-        F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params
+        F_totale_collecte,
+        Pt_collecte,
+        labels,
+        ind_masse,
+        Pt_ancrage,
+        Masse_centre,
+        trial_name,
+        initial_guess,
+        optimize_static_mass,
+        dict_fixed_params,
     )
 
     # recuperation et affichage
@@ -1447,7 +1504,7 @@ def main():
     F_point = []
 
     for i in range(len(essais)):
-        M.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + 405 * i + 5 * i]))
+        M.append(np.array(Solution[12 + n * m * 3 * i + 5 * i : 17 + 405 * i + 5 * i]))
         Pt.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (135, 3)))
 
         F_totale.append(
@@ -1475,7 +1532,9 @@ def main():
         F_point[i] = cas.evalf(F_point[i])
         F_point[i] = np.array(F_point[i])
 
-        Pt_collecte[i] = np.array(Pt_collecte[i])  # permet de mettre pt collecte sous la bonne forme pour l'utiliser apres
+        Pt_collecte[i] = np.array(
+            Pt_collecte[i]
+        )  # permet de mettre pt collecte sous la bonne forme pour l'utiliser apres
         Pt_ancrage[i] = np.array(Pt_ancrage[i])  # permet de mettre pt ancrage sous la bonne forme pour l'utiliser apres
 
     end_main = time.time()
@@ -1515,7 +1574,6 @@ def main():
         ax.set_zlabel("z (m)")
     plt.legend()
 
-
     # calcul de l'erreur :
     # sur la position/force
     erreur_position = []
@@ -1541,7 +1599,6 @@ def main():
             "-Erreur sur la force-  " + str(trial_name[p]) + " = " + str(erreur_force[p]) + " N"
         )
 
-
     # ENREGISTREMENT PICKLE#
     path = "results/result_multi_essais/" + "optim_sur_35_essais_corr" + ".pkl"
     with open(path, "wb") as file:
@@ -1557,6 +1614,7 @@ def main():
         pickle.dump(trial_name, file)
 
     plt.show()  # on affiche tous les graphes
+
 
 if __name__ == "__main__":
     main()

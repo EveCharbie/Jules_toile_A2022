@@ -995,7 +995,7 @@ def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
     :return: Pt_interpole: DM(3,n*m) (même dimension que Pos_repos)
     """
     # liste avec les bons points aux bons endroits, et le reste vaut 0
-    Pt_interpole = cas.DM.zeros((3, n*m))
+    Pt_interpole = cas.DM.zeros((3, n * m))
     for ind in range(135):
         if "t" + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index("t" + str(ind))]) == False:
             Pt_interpole[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]

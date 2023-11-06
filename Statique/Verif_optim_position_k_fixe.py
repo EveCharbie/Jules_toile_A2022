@@ -135,10 +135,22 @@ def Param_variable(Masse, ind_masse):
 
     return k, k_oblique, M
 
+
 ####################################################################################################################
 
-def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params):
 
+def Optimisation(
+    F_totale_collecte,
+    Pt_collecte,
+    labels,
+    ind_masse,
+    Pt_ancrage,
+    Masse_centre,
+    trial_name,
+    initial_guess,
+    optimize_static_mass,
+    dict_fixed_params,
+):
     # PARAM FIXES
     n = 15
     m = 9
@@ -156,7 +168,7 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
 
     # NLP VALUES
     Ma = cas.MX.sym("Ma", 5)
-    X = cas.MX.sym("X", n*m * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
+    X = cas.MX.sym("X", n * m * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
 
     # Ma
     w0_m, lbw_m, ubw_m = m_bounds(Masse_centre)
@@ -179,7 +191,17 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
 
     # en statique on ne fait pas de boucle sur le temps :
     K, _, _ = Param_variable(Ma, ind_masse)
-    J = a_minimiser(X, K, Ma, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, ind_masse, optimize_static_mass,)
+    J = a_minimiser(
+        X,
+        K,
+        Ma,
+        Pt_collecte,
+        Pt_ancrage,
+        dict_fixed_params,
+        labels,
+        ind_masse,
+        optimize_static_mass,
+    )
     obj = J(X, Ma)
 
     # Create an NLP solver
@@ -198,8 +220,8 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
 
 ##########################################################################################################################
 
-def main():
 
+def main():
     initial_guess = InitialGuessType.RESTING_POSITION  ### to be tested with SURFACE_INTERPOLATION
     optimize_static_mass = True
 
@@ -224,18 +246,29 @@ def main():
         print("essai à vide : " + str(vide_name))
 
     dict_fixed_params = Param_fixe()
-    F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage = get_list_results_static(participant, trial_name, frame, dict_fixed_params)
+    F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage = get_list_results_static(
+        participant, trial_name, frame, dict_fixed_params
+    )
 
     ##########################################################################################################################
 
     start_main = time.time()
 
     Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f = Optimisation(
-        F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params,
+        F_totale_collecte,
+        Pt_collecte,
+        labels,
+        ind_masse,
+        Pt_ancrage,
+        Masse_centre,
+        trial_name,
+        initial_guess,
+        optimize_static_mass,
+        dict_fixed_params,
     )
 
     M = np.array(Solution[0:5])
-    Pt = np.reshape(Solution[5:], (n*m, 3))
+    Pt = np.reshape(Solution[5:], (n * m, 3))
     print("M = " + str(M))
     end_main = time.time()
 
@@ -252,7 +285,6 @@ def main():
     print("différence entre les forces : " + str(F_totale_opt - F_totale_collecte))
     print("**************************************************************************")
     print("**************************************************************************")
-
 
     #######################################################################################################################
 
@@ -305,12 +337,11 @@ def main():
         for i in range(3):
             erreur_force += (F_point_opt[ind, i]) ** 2
 
-
     print("Erreur sur la position : " + str(erreur_position) + " m")
     print("Erreur sur la force : " + str(erreur_force) + " N")
 
-
     plt.show()
+
 
 if __name__ == "__main__":
     main()

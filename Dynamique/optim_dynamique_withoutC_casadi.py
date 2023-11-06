@@ -22,6 +22,7 @@ import time
 import pickle
 
 import sys
+
 sys.path.append("../")
 from enums import InitialGuessType
 
@@ -29,6 +30,7 @@ sys.path.append("../Statique/")
 from Optim_35_essais_kM_regul_koblique import Param_fixe
 from Verif_optim_position_k_fixe import Optimisation
 from modele_dynamique_nxm_DimensionsReelles import Resultat_PF_collecte, Point_ancrage, Point_toile_init
+
 
 def get_list_results_dynamic(participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval):
     F_totale_collecte, Pt_collecte_tab, labels, ind_masse = Resultat_PF_collecte(
@@ -39,9 +41,9 @@ def get_list_results_dynamic(participant, static_trial_name, empty_trial_name, t
 
     return F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage
 
+
 ##########################################################################################################################
 def main():
-
     # SELECTION OF THE RESULTS FROM THE DATA COLLECTION
     participant = 1
     # participant_1: 64.5 kg
@@ -61,7 +63,9 @@ def main():
     optimize_static_mass = False
 
     dict_fixed_params = Param_fixe()
-    F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage = get_list_results_dynamic(participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval)
+    F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage = get_list_results_dynamic(
+        participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval
+    )
 
     ########################################################################################################################
 
@@ -69,8 +73,16 @@ def main():
 
     for idx, frame in enumerate(jump_frame_index_interval):
         Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f = Optimisation(
-            F_totale_collecte[idx, :], Pt_collecte[idx, :, :], labels, ind_masse, Pt_ancrage[idx, :, :], weight, trial_name, initial_guess,
-            optimize_static_mass, dict_fixed_params
+            F_totale_collecte[idx, :],
+            Pt_collecte[idx, :, :],
+            labels,
+            ind_masse,
+            Pt_ancrage[idx, :, :],
+            weight,
+            trial_name,
+            initial_guess,
+            optimize_static_mass,
+            dict_fixed_params,
         )
 
         # recuperation et affichage
@@ -81,27 +93,27 @@ def main():
         F_point = []
 
         for i in range(len(essais)):
-            M.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
-            Pt.append(np.reshape(Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i], (n*m, 3)))
+            M.append(np.array(Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i]))
+            Pt.append(np.reshape(Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i], (n * m, 3)))
 
             F_totale.append(
                 Calcul_Pt_F(
-                    Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
+                    Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i],
                     Pt_ancrage[i],
                     dict_fixed_params,
                     k,
                     ind_masse[i],
-                    Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
+                    Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i],
                 )[0]
             )
             F_point.append(
                 Calcul_Pt_F(
-                    Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
+                    Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i],
                     Pt_ancrage[i],
                     dict_fixed_params,
                     k,
                     ind_masse[i],
-                    Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
+                    Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i],
                 )[1]
             )
 
@@ -109,8 +121,12 @@ def main():
             F_point[i] = cas.evalf(F_point[i])
             F_point[i] = np.array(F_point[i])
 
-            Pt_collecte[i] = np.array(Pt_collecte[i])  # permet de mettre pt collecte sous la bonne forme pour l'utiliser apres
-            Pt_ancrage[i] = np.array(Pt_ancrage[i])  # permet de mettre pt ancrage sous la bonne forme pour l'utiliser apres
+            Pt_collecte[i] = np.array(
+                Pt_collecte[i]
+            )  # permet de mettre pt collecte sous la bonne forme pour l'utiliser apres
+            Pt_ancrage[i] = np.array(
+                Pt_ancrage[i]
+            )  # permet de mettre pt ancrage sous la bonne forme pour l'utiliser apres
 
         end_main = time.time()
         temps_min = (end_main - start_main) / 60
@@ -126,7 +142,9 @@ def main():
             ax = plt.subplot(5, 7, i + 1, projection="3d")
             ax.set_box_aspect([1.1, 1.8, 1])
             ax.plot(Pt[i][:, 0], Pt[i][:, 1], Pt[i][:, 2], "+r", label="Points de la toile optimisés")
-            ax.plot(Pt_ancrage[i][:, 0], Pt_ancrage[i][:, 1], Pt_ancrage[i][:, 2], ".k", label="Points d'ancrage simulés")
+            ax.plot(
+                Pt_ancrage[i][:, 0], Pt_ancrage[i][:, 1], Pt_ancrage[i][:, 2], ".k", label="Points d'ancrage simulés"
+            )
             ax.plot(
                 Pt[i][ind_masse[i], 0],
                 Pt[i][ind_masse[i], 1],
@@ -148,7 +166,6 @@ def main():
             ax.set_ylabel("y (m)")
             ax.set_zlabel("z (m)")
         plt.legend()
-
 
         # calcul de l'erreur :
         # sur la position/force
@@ -175,7 +192,6 @@ def main():
                 "-Erreur sur la force-  " + str(trial_name[p]) + " = " + str(erreur_force[p]) + " N"
             )
 
-
         # ENREGISTREMENT PICKLE#
         path = "results/result_multi_essais/" + "optim_sur_35_essais_corr" + ".pkl"
         with open(path, "wb") as file:
@@ -191,6 +207,7 @@ def main():
             pickle.dump(trial_name, file)
 
         plt.show()  # on affiche tous les graphes
+
 
 if __name__ == "__main__":
     main()

@@ -32,13 +32,14 @@ from scipy.interpolate import interp1d
 import pickle
 
 import sys
+
 sys.path.append("../")
 from enums import InitialGuessType
 
 from Optim_35_essais_kM_regul_koblique import interpolation_collecte, a_minimiser, Param_fixe
+
 sys.path.append("../Dynamique/")
 from modele_dynamique_nxm_DimensionsReelles import surface_interpolation_collecte
-
 
 
 n = 15  # nombre de mailles sur le grand cote
@@ -103,7 +104,9 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
     elif initial_guess == InitialGuessType.RESTING_POSITION:
         Pt_interpolated = Pt_repos
     elif initial_guess == InitialGuessType.SURFACE_INTERPOLATION:
-        Pt_interpolated = surface_interpolation_collecte([Pt_collecte], [Pt_ancrage], Pt_repos, Pt_ancrage_repos, [labels])[0, :, :].T
+        Pt_interpolated = surface_interpolation_collecte(
+            [Pt_collecte], [Pt_ancrage], Pt_repos, Pt_ancrage_repos, [labels]
+        )[0, :, :].T
     else:
         raise RuntimeError(f"The interpolation type of the initial guess {initial_guess} is not recognized.")
 
@@ -112,7 +115,7 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
     ubw_Pt = []
     w0_Pt = []
 
-    for k in range(n*m*3):
+    for k in range(n * m * 3):
         if k % 3 == 0:  # limites et guess en x
             lbw_Pt += [Pt_interpolated[0, int(k // 3)] - 0.3]
             ubw_Pt += [Pt_interpolated[0, int(k // 3)] + 0.3]
@@ -129,8 +132,18 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
     return w0_Pt, lbw_Pt, ubw_Pt
 
 
-def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params):
-
+def Optimisation(
+    F_totale_collecte,
+    Pt_collecte,
+    labels,
+    ind_masse,
+    Pt_ancrage,
+    Masse_centre,
+    trial_name,
+    initial_guess,
+    optimize_static_mass,
+    dict_fixed_params,
+):
     # PARAM FIXES
     n = 15
     m = 9
@@ -159,7 +172,7 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
 
         # NLP VALUES
         Ma = cas.MX.sym("Ma", 5)
-        X = cas.MX.sym("X", n*m * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
+        X = cas.MX.sym("X", n * m * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
 
         # Ma
         w0_m, lbw_m, ubw_m = m_bounds(masse_essai)
@@ -169,7 +182,9 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
         w += [Ma]
 
         # X
-        w0_Pt, lbw_Pt, ubw_Pt = Pt_bounds(initial_guess, Pt_collecte[i], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels[i])
+        w0_Pt, lbw_Pt, ubw_Pt = Pt_bounds(
+            initial_guess, Pt_collecte[i], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels[i]
+        )
         lbw += lbw_Pt
         ubw += ubw_Pt
         w0 += w0_Pt
@@ -210,8 +225,8 @@ def Optimisation(F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, 
 
 ##########################################################################################################################
 
-def main():
 
+def main():
     initial_guess = InitialGuessType.RESTING_POSITION  ### to be tested with SURFACE_INTERPOLATION
     optimize_static_mass = True
 
@@ -226,7 +241,6 @@ def main():
         + [1, 4, 5, 6, 7, 8, 9, 10, 11]
         + [2, 3, 5, 6, 7, 8, 9, 10, 11]
     )
-
 
     for i in range(0, 9):  # 9 essais par zone
         essais += ["labeled_statique_centrefront_D" + str(nb_disques[i])]
@@ -266,14 +280,25 @@ def main():
     print(vide_name)
 
     dict_fixed_params = Param_fixe()
-    F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage = get_list_results_static(participant, trial_name, frame, dict_fixed_params)
+    F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage = get_list_results_static(
+        participant, trial_name, frame, dict_fixed_params
+    )
 
     ########################################################################################################################
 
     start_main = time.time()
 
     Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f = Optimisation(
-        F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage, Masse_centre, trial_name, initial_guess, optimize_static_mass, dict_fixed_params
+        F_totale_collecte,
+        Pt_collecte,
+        labels,
+        ind_masse,
+        Pt_ancrage,
+        Masse_centre,
+        trial_name,
+        initial_guess,
+        optimize_static_mass,
+        dict_fixed_params,
     )
 
     ####recuperation et affichage####
@@ -305,54 +330,55 @@ def main():
     Pt_collecte_left = []
     Pt_ancrage_left = []
 
-
     # Raideurs#
     k = np.array(Solution[:12])
     print("k = " + str(k))
 
     # Masses#
     for i in range(0, 9):  # nombre essais centrefront
-        M_centrefront.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
+        M_centrefront.append(np.array(Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i]))
     for i in range(0, 9):
         print("M_centrefront_" + str(i) + " = " + str(M_centrefront[i]))
 
     for i in range(9, 18):  # nb essais statique : 9
-        M_statique.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
+        M_statique.append(np.array(Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i]))
     for i in range(0, 9):
         print("M_statique_" + str(i) + " = " + str(M_statique[i]))
 
     for i in range(18, 27):  # nb essais leftfront: 9
-        M_leftfront.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
+        M_leftfront.append(np.array(Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i]))
     for i in range(0, 9):
         print("M_leftfront_" + str(i) + " = " + str(M_leftfront[i]))
 
     for i in range(27, 36):  # nb essais left: 9
-        M_left.append(np.array(Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i]))
+        M_left.append(np.array(Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i]))
     for i in range(0, 9):
         print("M_left_" + str(i) + " = " + str(M_left[i]))
 
     # Points#
     ###centrefront###
     for i in range(0, 9):
-        Pt_centrefront.append(np.reshape(Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i], (n*m, 3)))
+        Pt_centrefront.append(
+            np.reshape(Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i], (n * m, 3))
+        )
         F_totale_centrefront.append(
             Calcul_Pt_F(
-                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
+                Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
+                Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i],
             )[0]
         )
         F_point_centrefront.append(
             Calcul_Pt_F(
-                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
+                Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
+                Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i],
             )[1]
         )
 
@@ -364,25 +390,25 @@ def main():
         Pt_ancrage_centrefront.append(np.array(Pt_ancrage[i]))
     ###statique###
     for i in range(9, 18):
-        Pt_statique.append(np.reshape(Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i], (n*m, 3)))
+        Pt_statique.append(np.reshape(Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i], (n * m, 3)))
         F_totale_statique.append(
             Calcul_Pt_F(
-                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
+                Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
+                Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i],
             )[0]
         )
         F_point_statique.append(
             Calcul_Pt_F(
-                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
+                Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
+                Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i],
             )[1]
         )
 
@@ -394,25 +420,25 @@ def main():
         Pt_ancrage_statique.append(np.array(Pt_ancrage[i]))
     ###leftfront###
     for i in range(18, 27):
-        Pt_leftfront.append(np.reshape(Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i], (n*m, 3)))
+        Pt_leftfront.append(np.reshape(Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i], (n * m, 3)))
         F_totale_leftfront.append(
             Calcul_Pt_F(
-                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
+                Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + n*m*3 * i + 5 * i : 17 + n*m*3 * i + 5 * i],
+                Solution[12 + n * m * 3 * i + 5 * i : 17 + n * m * 3 * i + 5 * i],
             )[0]
         )
         F_point_leftfront.append(
             Calcul_Pt_F(
-                Solution[17 + n*m*3 * i + 5 * i : 422 + n*m*3 * i + 5 * i],
+                Solution[17 + n * m * 3 * i + 5 * i : 422 + n * m * 3 * i + 5 * i],
                 Pt_ancrage[i],
                 dict_fixed_params,
                 Solution[:12],
                 ind_masse[i],
-                Solution[12 + n*m*3 * i + 5 * i : 17 + 405 * i + 5 * i],
+                Solution[12 + n * m * 3 * i + 5 * i : 17 + 405 * i + 5 * i],
             )[1]
         )
 
@@ -424,7 +450,7 @@ def main():
         Pt_ancrage_leftfront.append(np.array(Pt_ancrage[i]))
     ###left###
     for i in range(27, 36):
-        Pt_left.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (n*m, 3)))
+        Pt_left.append(np.reshape(Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i], (n * m, 3)))
         F_totale_left.append(
             Calcul_Pt_F(
                 Solution[17 + 405 * i + 5 * i : 422 + 405 * i + 5 * i],
@@ -570,7 +596,11 @@ def main():
         ax = plt.subplot(3, 3, i + 1, projection="3d")
         ax.set_box_aspect([1.1, 1.8, 1])
         ax.plot(
-            Pt_leftfront[i][:, 0], Pt_leftfront[i][:, 1], Pt_leftfront[i][:, 2], "+r", label="Points de la toile optimisés"
+            Pt_leftfront[i][:, 0],
+            Pt_leftfront[i][:, 1],
+            Pt_leftfront[i][:, 2],
+            "+r",
+            label="Points de la toile optimisés",
         )
         ax.plot(
             Pt_ancrage_leftfront[i][:, 0],
@@ -628,7 +658,11 @@ def main():
             label="Point optimisés le plus bas d'indice " + str(ind_masse[i + 27]),
         )
         ax.plot(
-            Pt_collecte_left[i][0, :], Pt_collecte_left[i][1, :], Pt_collecte_left[i][2, :], ".b", label="Points collecte"
+            Pt_collecte_left[i][0, :],
+            Pt_collecte_left[i][1, :],
+            Pt_collecte_left[i][2, :],
+            ".b",
+            label="Points collecte",
         )
         label_masse = labels[i + 27].index("t" + str(ind_masse[i + 27]))
         ax.plot(

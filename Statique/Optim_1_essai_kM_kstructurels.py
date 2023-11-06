@@ -883,8 +883,8 @@ def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
     :return: Pt_interpole: DM(3,n*m) (même dimension que Pos_repos)
     """
     # liste avec les bons points aux bons endroits, et le reste vaut 0
-    Pt_interpole = cas.DM.zeros((3, n*m))
-    for ind in range(n*m):
+    Pt_interpole = cas.DM.zeros((3, n * m))
+    for ind in range(n * m):
         if "t" + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index("t" + str(ind))]) == False:
             Pt_interpole[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]
 
@@ -943,16 +943,16 @@ def list2tab(list):
     :param list: MX(n*m*3,1)
     :return: tab: MX(n*m,3)
     """
-    tab = cas.MX.zeros(n*m, 3)
-    for ind in range(n*m):
+    tab = cas.MX.zeros(n * m, 3)
+    for ind in range(n * m):
         for i in range(3):
             tab[ind, i] = list[i + 3 * ind]
     return tab
 
 
 def tab2list(tab):
-    list = cas.MX.zeros(n*m * 3)
-    for i in range(n*m):
+    list = cas.MX.zeros(n * m * 3)
+    for i in range(n * m):
         for j in range(3):
             list[j + 3 * i] = tab[i, j]
     return list
@@ -1067,7 +1067,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
         ubw_Pt = []
         w0_Pt = []
 
-        for k in range(n*m*3):
+        for k in range(n * m * 3):
             if k % 3 == 0:  # limites et guess en x
                 lbw_Pt += [Pt_inter[0, int(k // 3)] - 0.3]
                 ubw_Pt += [Pt_inter[0, int(k // 3)] + 0.3]
@@ -1099,7 +1099,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
         ubw_Pt = []
         w0_Pt = []
 
-        for k in range(n*m*3):
+        for k in range(n * m * 3):
             if k % 3 == 0:  # limites et guess en x
                 lbw_Pt += [Pos[int(k // 3), 0] - 0.3]
                 ubw_Pt += [Pos[int(k // 3), 0] + 0.3]
@@ -1136,7 +1136,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
 
     # NLP VALUES
     K = cas.MX.sym("K", 8 + 5)
-    X = cas.MX.sym("X", n*m * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
+    X = cas.MX.sym("X", n * m * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
     if initial_guess == "interpolation":
         lbw_Pt, ubw_Pt, w0_Pt = Pt_bounds_interp(Pt_collecte, Pt_ancrage, labels, F_totale_collecte)
     if initial_guess == "repos":
@@ -1214,7 +1214,7 @@ Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fi
 
 k = np.array(Solution[:8])
 M = np.array(Solution[8:13])
-Pt = np.reshape(Solution[13:], (n*m, 3))
+Pt = np.reshape(Solution[13:], (n * m, 3))
 print("k = " + str(k))
 print("M = " + str(M))
 end_main = time.time()

@@ -1000,8 +1000,8 @@ def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
     :return: Pt_interpole: DM(3,n*m) (même dimension que Pos_repos)
     """
     # liste avec les bons points aux bons endroits, et le reste vaut 0
-    Pt_interpole = cas.DM.zeros((3, n*m))
-    for ind in range(n*m):
+    Pt_interpole = cas.DM.zeros((3, n * m))
+    for ind in range(n * m):
         if "t" + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index("t" + str(ind))]) == False:
             Pt_interpole[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]
 
@@ -1238,7 +1238,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
         ubw_Pt = []
         w0_Pt = []
 
-        for k in range(n*m*3):
+        for k in range(n * m * 3):
             if k % 3 == 0:  # limites et guess en x
                 lbw_Pt += [Pt_inter[0, int(k // 3)] - 0.3]
                 ubw_Pt += [Pt_inter[0, int(k // 3)] + 0.3]
@@ -1265,7 +1265,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
         ubw_Pt = []
         w0_Pt = []
 
-        for k in range(n*m*3):
+        for k in range(n * m * 3):
             if k % 3 == 0:  # limites et guess en x
                 lbw_Pt += [Pos[int(k // 3), 0] - 0.3]
                 ubw_Pt += [Pos[int(k // 3), 0] + 0.3]
