@@ -12,3 +12,5 @@ Data/Pictures/
 Plots/
 
 .idea/
+
+__pycache__/

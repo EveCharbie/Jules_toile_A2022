@@ -16,10 +16,8 @@ from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import make_pipeline
 from IPython import embed
 
+from enums import MassType, DisplayType, InitialGuessType
 
-# ACTION :
-affichage = "subplot"  #'subplot' #'animation'
-masse_type = "repartie"  #'repartie' #'ponctuelle'
 
 # PARAMETRES :
 n = 15  # nombre de mailles sur le grand cote
@@ -1111,19 +1109,10 @@ def Point_toile_init(Point_collecte, labels):
                 point_toile[frame, :, int(lab[1:])] = Point_collecte[frame][:, idx]
             if lab not in label_toile:
                 label_toile.append(lab)
-
-    # # transformation des elements en array
-    # liste_point_toile = []
-    # for list_point in point_toile:
-    #     tab_point = np.array((list_point[0]))
-    #     for ligne in range(1, len(list_point)):
-    #         tab_point = np.vstack((tab_point, list_point[ligne]))
-    #     liste_point_toile.append(tab_point)
-
     return point_toile, label_toile
 
 
-def interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
+def surface_interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
     """
     Interpolate to fill the missing markers.
     """
@@ -1275,7 +1264,7 @@ def integration_error(Pt_intergres, Pt_interpoles):
     """
 
     position_iplus1 = Pt_interpoles
-    point_theorique = position_iplus1.T
+    point_theorique = position_iplus1
 
     err_rel = (np.abs(point_theorique - Pt_intergres) / point_theorique)
     err_abs = np.abs(point_theorique - Pt_intergres)
@@ -1372,10 +1361,8 @@ def single_shooting_euler_integration(nb_frame, Pt_interpoles, labels):
 
     # Velocity of the second frame by finite difference
     initial_velocity = velocity_from_finite_difference(Pt_interpoles[0], Pt_interpoles[2], labels)
-    Velocity_tot[0, :, :] = initial_velocity.T
-
-    Pt_interpolated = interpolation_collecte(Pt_interpoles[0], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
-    Pt_tot[0, :, :] = Pt_interpolated.T
+    Velocity_tot[0, :, :] = initial_velocity
+    Pt_tot[0, :, :] = Pt_interpoles[0]
 
     for frame in range(nb_frame - 1):
 
@@ -1411,29 +1398,17 @@ def single_shooting_euler_integration(nb_frame, Pt_interpoles, labels):
     return Pt_tot, erreur_relative, erreur_absolue, F_all_point, v_all
 
 
-def multiple_shooting_integration(nb_frame, Pt_interpoles, labels):
+def multiple_shooting_integration(nb_frame, Pt_interpoles):
     """
     Computes the position of the points by integrating (from the forces and initial conditions).
     """
-    # def dyn_fun(t, Pt):
-    #     bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt)
-    #     M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
-    #     F_point = static_force_in_each_point(F_spring, F_spring_croix, F_masses)
-    #     accel_current = np.zeros((n * m, 3))
-    #     for i in range(0, n * m):
-    #         accel_current[i, :] = F_point[i, :] / M[i]
-    #     return accel_current
-    #
-    # solver = scipy.integrate.ode(fun)
-    # solver.set_integrator('dop853')
-
-    def dyn_fun(t, x):
+    def dyn_fun(t, y):
         """
         x = [p, v]
         dx = [v, dv]
         """
-        p = x[:m*n*3].reshape(m*n, 3)
-        v = x[m*n*3:].reshape(m*n, 3)
+        p = y[:m*n*3].reshape(m*n, 3)
+        v = y[m*n*3:].reshape(m*n, 3)
 
         bt1, bt2, btc1, btc2 = spring_bouts_collecte(p.T)
         M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
@@ -1464,37 +1439,23 @@ def multiple_shooting_integration(nb_frame, Pt_interpoles, labels):
             current_velocity = velocity_from_finite_difference(Pt_interpoles, idx_before=frame-1, idx_after=frame+1)
         Velocity_tot[frame, :, :] = current_velocity
 
-        # Computation the forces based on the state of the model
-        # M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
-        # F_point = static_force_in_each_point(F_spring, F_spring_croix, F_masses)
-        # F_all_point[frame, :, :] = F_point
-        # solver.set_initial_value(Pt_interpolated.T, 0)
-        # velocity_diff = solver.y
-        # Flatten array in the following order:
-        # Pt_interpolated.T[24, :] = Pt_interpolated.T.flatten()[24*3:25*3]
-        # Velocity_tot[frame, :, :][24, :] = Velocity_tot[frame, :, :].flatten()[24 * 3:25 * 3]
-
         y0 = np.hstack((Pt_interpoles[frame, :, :].T.flatten(), Velocity_tot[frame, :, :].flatten()))
         sol = scipy.integrate.solve_ivp(dyn_fun,
                                         t_span=[0, dt],
                                         y0=y0,
                                         method="DOP853")
-        position_diff = sol[0]
-        velocity_diff = sol[1]
+        position_diff = sol.y[:m*n*3, -1].reshape(m*n, 3)
+        velocity_diff = sol.y[m*n*3:, -1].reshape(m*n, 3)
         velocity_next = current_velocity + velocity_diff
-        Pt_integ = Pt_interpoles[frame].T + position_diff
-
-        # Make sure the intial velocity approximation does not have too much of an effect on the integration
-        # by regularizing with the finite difference velocity
-        # if frame == 1:
-        #     velocity_next = (initial_velocity + velocity_next) / 2
+        Pt_integ = Pt_interpoles[frame] + position_diff
 
         Pt_tot[frame + 1, :, :] = Pt_integ
         Velocity_tot[frame + 1, :, :] = velocity_next
 
         # --- Errors ---#
-        relative_error.append(integration_error(Pt_integ, Pt_interpoles[frame + 1])[0])
-        absolute_error.append(integration_error(Pt_integ, Pt_interpoles[frame + 1])[1])
+        rel, abs = integration_error(Pt_integ, Pt_interpoles[frame + 1])
+        relative_error.append(rel)
+        absolute_error.append(abs)
 
     return Pt_tot, Velocity_tot, erreur_relative, erreur_absolue, F_all_point
 
@@ -1536,109 +1497,114 @@ def Animation(Pt_integres, Pt_collecte_tab, jump_frame_index_interval):
 ###############################################################################
 ###############################################################################
 
-# SELECTION OF THE RESULTS FROM THE DATA COLLECTION
-participant = 1
-static_trial_name = "labeled_statique_leftfront_D7"
-trial_name = "labeled_p1_sauthaut_01"
-empty_trial_name = "labeled_statique_centrefront_vide"
-jump_frame_index_interval = [
-    7000,
-    7170,
-]  # This range repends on the trial. To find it, one should use the code plateforme_verification_toutesversions.py.
-dt = 1/500  # Hz
+def main():
+    # SELECTION OF THE RESULTS FROM THE DATA COLLECTION
+    participant = 1
+    static_trial_name = "labeled_statique_leftfront_D7"
+    trial_name = "labeled_p1_sauthaut_01"
+    empty_trial_name = "labeled_statique_centrefront_vide"
+    jump_frame_index_interval = [
+        7000,
+        7170,
+    ]  # This range repends on the trial. To find it, one should use the code plateforme_verification_toutesversions.py.
+    dt = 1/500  # Hz
 
-nb_frame = jump_frame_index_interval[1] - jump_frame_index_interval[0] - 1  # The first frame is excluded
-dict_fixed_params = spring_lengths()
+    nb_frame = jump_frame_index_interval[1] - jump_frame_index_interval[0] - 1  # The first frame is excluded
+    dict_fixed_params = spring_lengths()
 
-# Récupération de tous les points des frames de l'intervalle dynamics
-F_totale_collecte, Pt_collecte_tab, labels, ind_masse = Resultat_PF_collecte(
-    participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval
-)
+    # Récupération de tous les points des frames de l'intervalle dynamics
+    F_totale_collecte, Pt_collecte_tab, labels, ind_masse = Resultat_PF_collecte(
+        participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval
+    )
 
-# Récupération des parametres du problemes
-k, k_oblique, M, C = Param()
-Pt_ancrage_repos, Pt_repos = Points_ancrage_repos(dict_fixed_params)
+    # Récupération des parametres du problemes
+    k, k_oblique, M, C = Param()
+    Pt_ancrage_repos, Pt_repos = Points_ancrage_repos(dict_fixed_params)
 
-Pt_ancrage_collecte, labels_ancrage = Point_ancrage(Pt_collecte_tab, labels)
-Pt_toile_collecte, label_toile = Point_toile_init(Pt_collecte_tab, labels)
+    Pt_ancrage_collecte, labels_ancrage = Point_ancrage(Pt_collecte_tab, labels)
+    Pt_toile_collecte, label_toile = Point_toile_init(Pt_collecte_tab, labels)
 
-Pt_interpoles = interpolation_collecte(Pt_collecte_tab, Pt_ancrage_collecte, Pt_repos, Pt_ancrage_repos, labels)
+    Pt_interpoles = surface_interpolation_collecte(Pt_collecte_tab, Pt_ancrage_collecte, Pt_repos, Pt_ancrage_repos, labels)
 
-# Pt_integres, erreur_relative, erreur_absolue, static_force_in_each_points, v_all = multiple_shooting_euler_integration(nb_frame, Pt_interpoles, labels, Masse_centre)
-Pt_integres, erreur_relative, erreur_absolue, static_force_in_each_points, v_all = multiple_shooting_integration(nb_frame, Pt_interpoles, labels)
+    # Pt_integres, erreur_relative, erreur_absolue, static_force_in_each_points, v_all = multiple_shooting_euler_integration(nb_frame, Pt_interpoles, labels, Masse_centre)
+    Pt_integres, erreur_relative, erreur_absolue, static_force_in_each_points, v_all = multiple_shooting_integration(nb_frame, Pt_interpoles)
 
-# Plot the position of the markers vs model points at the initial instant
-fig = plt.figure(0)
-ax = fig.add_subplot(111, projection='3d')
-ax.set_box_aspect([1.1, 1.8, 1])
-ax.plot(0, 0, -1.2, 'ow')
+    # Plot the position of the markers vs model points at the initial instant
+    fig = plt.figure(0)
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_box_aspect([1.1, 1.8, 1])
+    ax.plot(0, 0, -1.2, 'ow')
 
-ax.plot(Pt_ancrage_repos[:, 0], Pt_ancrage_repos[:, 1], Pt_ancrage_repos[:, 2], '.k', mfc='none', alpha=0.5, label='Model Frame')
-ax.plot(Pt_repos.T[0, :], Pt_repos.T[1, :], Pt_repos.T[2, :], '.b', mfc='none', alpha=0.5, label='Model Trampline')
+    ax.plot(Pt_ancrage_repos[:, 0], Pt_ancrage_repos[:, 1], Pt_ancrage_repos[:, 2], '.k', mfc='none', alpha=0.5, label='Model Frame')
+    ax.plot(Pt_repos.T[0, :], Pt_repos.T[1, :], Pt_repos.T[2, :], '.b', mfc='none', alpha=0.5, label='Model Trampline')
 
-ax.plot(Pt_ancrage_collecte[:, 0], Pt_ancrage_collecte[:, 1], Pt_ancrage_collecte[:, 2], '.k', label='Experimental Frame')
-ax.plot(Pt_toile_collecte[0, :], Pt_toile_collecte[1, :], Pt_toile_collecte[2, :], '.b', label='Experimental Trampoline')
-ax.plot(Pt_toile_collecte[0, ind_masse], Pt_toile_collecte[1, ind_masse], Pt_toile_collecte[2, ind_masse], '.g', label='Lowest point on the interval')
+    ax.plot(Pt_ancrage_collecte[:, 0], Pt_ancrage_collecte[:, 1], Pt_ancrage_collecte[:, 2], '.k', label='Experimental Frame')
+    ax.plot(Pt_toile_collecte[0, :], Pt_toile_collecte[1, :], Pt_toile_collecte[2, :], '.b', label='Experimental Trampoline')
+    ax.plot(Pt_toile_collecte[0, ind_masse], Pt_toile_collecte[1, ind_masse], Pt_toile_collecte[2, ind_masse], '.g', label='Lowest point on the interval')
 
-ax.set_title("Data collection markers vs model points")
-ax.legend()
-plt.show()
-
-
-# Animation of the markers vs integrated marker position
-Animation(Pt_integres, Pt_collecte_tab, jump_frame_index_interval)
+    ax.set_title("Data collection markers vs model points")
+    ax.legend()
+    plt.show()
 
 
-# Plot the model and springs at the initial instant
-Affichage_points_collecte_t(Pt_repos.T, Pt_ancrage_repos, True, nb_frame, ind_masse)
-plt.show()
+    # Animation of the markers vs integrated marker position
+    Animation(Pt_integres, Pt_collecte_tab, jump_frame_index_interval)
 
 
-all_F_totale_collecte, all_Pt_collecte_tab, all_labels, all_ind_masse = Resultat_PF_collecte(
-    participant, static_trial_name, empty_trial_name, trial_name, [0, 7763]
-)
-all_Pt_ancrage_collecte, label_ancrage = Point_ancrage(all_Pt_collecte_tab, all_labels)
+    # Plot the model and springs at the initial instant
+    Affichage_points_collecte_t(Pt_repos.T, Pt_ancrage_repos, True, nb_frame, ind_masse)
+    plt.show()
 
 
-# Plot the exeprimental forces vs model forces
-time = np.linspace(0, len(all_Pt_ancrage_collecte)*dt, len(all_Pt_ancrage_collecte)+1)
-z = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
-z_filtered = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
-az = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
-times_without_nans = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
-for i_marker in range(all_Pt_ancrage_collecte[0].shape[0]):
-    first_non_nan_hit = False
-    for i_frame in range(len(all_Pt_ancrage_collecte)):
-        if np.isnan(all_Pt_ancrage_collecte[i_frame][i_marker, 2]):
-            if not first_non_nan_hit:
-                continue
+    all_F_totale_collecte, all_Pt_collecte_tab, all_labels, all_ind_masse = Resultat_PF_collecte(
+        participant, static_trial_name, empty_trial_name, trial_name, [0, 7763]
+    )
+    all_Pt_ancrage_collecte, label_ancrage = Point_ancrage(all_Pt_collecte_tab, all_labels)
+
+
+    # Plot the exeprimental forces vs model forces
+    time = np.linspace(0, len(all_Pt_ancrage_collecte)*dt, len(all_Pt_ancrage_collecte)+1)
+    z = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
+    z_filtered = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
+    az = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
+    times_without_nans = [np.array([0]) for i_marker in range(all_Pt_ancrage_collecte[0].shape[0])]
+    for i_marker in range(all_Pt_ancrage_collecte[0].shape[0]):
+        first_non_nan_hit = False
+        for i_frame in range(len(all_Pt_ancrage_collecte)):
+            if np.isnan(all_Pt_ancrage_collecte[i_frame][i_marker, 2]):
+                if not first_non_nan_hit:
+                    continue
+                else:
+                    z[i_marker] = np.vstack((z[i_marker], z[i_marker][-1]))
             else:
-                z[i_marker] = np.vstack((z[i_marker], z[i_marker][-1]))
-        else:
-            z[i_marker] = np.vstack((z[i_marker], all_Pt_ancrage_collecte[i_frame][i_marker, 2]))
-            first_non_nan_hit = True
-            times_without_nans[i_marker] = np.vstack((times_without_nans[i_marker], time[i_frame]))
-    z[i_marker] = z[i_marker][1:]
-    times_without_nans[i_marker] = times_without_nans[i_marker][1:]
+                z[i_marker] = np.vstack((z[i_marker], all_Pt_ancrage_collecte[i_frame][i_marker, 2]))
+                first_non_nan_hit = True
+                times_without_nans[i_marker] = np.vstack((times_without_nans[i_marker], time[i_frame]))
+        z[i_marker] = z[i_marker][1:]
+        times_without_nans[i_marker] = times_without_nans[i_marker][1:]
 
-    a, b = scipy.signal.butter(4, 0.015)
-    z_filtered[i_marker] = scipy.signal.filtfilt(a, b, z[i_marker], method="gust")
-    az[i_marker] = ((z_filtered[i_marker][2:]+z_filtered[i_marker][:-2]-2*z_filtered[i_marker][1:-1])/(dt*dt))
+        a, b = scipy.signal.butter(4, 0.015)
+        z_filtered[i_marker] = scipy.signal.filtfilt(a, b, z[i_marker], method="gust")
+        az[i_marker] = ((z_filtered[i_marker][2:]+z_filtered[i_marker][:-2]-2*z_filtered[i_marker][1:-1])/(dt*dt))
 
 
-fig , ax = plt.subplots(2,1)
-for i_marker in range(len(z)):
-    if z[i_marker].shape != (0, ):
-        ax[0].plot(time[:-1], z[i_marker])
-        ax[0].plot(time[:-1], z_filtered[i_marker], '-r')
-        ax[1].plot(time[1:-2], az[i_marker])
-fig.suptitle('Frame markers')
-ax[0].set_xlabel('Time [s]')
-ax[0].set_ylabel('Z [m]')
-ax[1].set_xlabel('Time [s]')
-ax[1].set_ylabel(r'Acceleration [$m/s^-2$]')
-plt.savefig("../Plots/frame_markers.png")
-plt.show()
+    fig , ax = plt.subplots(2,1)
+    for i_marker in range(len(z)):
+        if z[i_marker].shape != (0, ):
+            ax[0].plot(time[:-1], z[i_marker])
+            ax[0].plot(time[:-1], z_filtered[i_marker], '-r')
+            ax[1].plot(time[1:-2], az[i_marker])
+    fig.suptitle('Frame markers')
+    ax[0].set_xlabel('Time [s]')
+    ax[0].set_ylabel('Z [m]')
+    ax[1].set_xlabel('Time [s]')
+    ax[1].set_ylabel(r'Acceleration [$m/s^-2$]')
+    plt.savefig("../Plots/frame_markers.png")
+    plt.show()
 
-# TODO: Plot the forces from the model vs force plates
-masse_cadre = 270
+    # TODO: Plot the forces from the model vs force plates
+    masse_cadre = 270
+
+
+if __name__ == "__main__":
+    main()
