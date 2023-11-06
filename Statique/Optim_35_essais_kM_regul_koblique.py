@@ -1067,9 +1067,10 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, optimize_sta
     )
     F_point = Force_point(F_spring, F_spring_croix, F_masses)
 
+    index_of_the_point_subject_to_masses = [ind_masse, ind_masse + 1, ind_masse - 1, ind_masse + 15, ind_masse - 15]
     F_totale = cas.MX.zeros(3)
     for ind in range(F_point.shape[0]):
-        if ind in ind_masse and optimize_static_mass == False:
+        if ind in index_of_the_point_subject_to_masses and optimize_static_mass == False:
             continue
         else:
             for i in range(3):
@@ -1104,7 +1105,7 @@ def a_minimiser(X, K, Ma, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, in
                 else:
                     Difference += (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
 
-    if type(K, cas.MX):
+    if type(K) == cas.MX:
         regul_k = K[8] ** 2 + K[9] ** 2 + K[10] ** 2 + K[11] ** 2
         output = (1e4) * Difference + (1e-6) * regul_k
         obj = cas.Function("f", [X, K, Ma], [output]).expand()

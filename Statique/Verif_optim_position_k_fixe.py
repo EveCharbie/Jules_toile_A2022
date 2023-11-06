@@ -55,7 +55,7 @@ def Param_variable(Masse, ind_masse):
 
     # ressorts entre le cadre du trampoline et la toile : k1,k2,k3,k4
     # k_bord = np.zeros(Nb_ressorts_cadre)
-    k_bord = cas.MX.zeros(Nb_ressorts_cadre)
+    k_bord = cas.DM.zeros(Nb_ressorts_cadre)
     # cotes verticaux de la toile :
     k_bord[0:n], k_bord[n + m : 2 * n + m] = k2, k2
     # cotes horizontaux :
@@ -65,12 +65,12 @@ def Param_variable(Masse, ind_masse):
     k_bord[n], k_bord[n + m - 1], k_bord[2 * n + m], k_bord[2 * (n + m) - 1] = k3, k3, k3, k3
 
     # ressorts horizontaux dans la toile
-    k_horizontaux = k6 * cas.MX.ones(n * (m - 1))
+    k_horizontaux = k6 * cas.DM.ones(n * (m - 1))
     k_horizontaux[0 : n * (m - 1) : n] = k5  # ressorts horizontaux du bord DE LA TOILE en bas
     k_horizontaux[n - 1 : n * (m - 1) : n] = k5  # ressorts horizontaux du bord DE LA TOILE en haut
 
     # ressorts verticaux dans la toile
-    k_verticaux = k8 * cas.MX.ones(m * (n - 1))
+    k_verticaux = k8 * cas.DM.ones(m * (n - 1))
     k_verticaux[0 : m * (n - 1) : m] = k7  # ressorts verticaux du bord DE LA TOILE a droite
     k_verticaux[m - 1 : n * m - m : m] = k7  # ressorts verticaux du bord DE LA TOILE a gauche
 
@@ -81,7 +81,7 @@ def Param_variable(Masse, ind_masse):
 
     # RESSORTS OBLIQUES
     # milieux :
-    k_oblique = cas.MX.zeros(Nb_ressorts_croix)
+    k_oblique = cas.DM.zeros(Nb_ressorts_croix)
 
     # coins :
     k_oblique[0], k_oblique[1] = k_oblique_1, k_oblique_1  # en bas a droite
@@ -214,14 +214,19 @@ def Optimisation(
         x0=cas.vertcat(*w0), lbx=cas.vertcat(*lbw), ubx=cas.vertcat(*ubw), lbg=cas.vertcat(*lbg), ubg=cas.vertcat(*ubg)
     )
     w_opt = sol["x"].full().flatten()
+    status = solver.stats()["return_status"]
 
-    return w_opt, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, sol.get("f")
+    return w_opt, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, sol.get("f"), status
 
 
 ##########################################################################################################################
 
 
 def main():
+
+    n = 15
+    m = 9
+
     initial_guess = InitialGuessType.RESTING_POSITION  ### to be tested with SURFACE_INTERPOLATION
     optimize_static_mass = True
 
@@ -254,7 +259,7 @@ def main():
 
     start_main = time.time()
 
-    Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f = Optimisation(
+    Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f, status = Optimisation(
         F_totale_collecte,
         Pt_collecte,
         labels,
