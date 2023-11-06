@@ -1258,23 +1258,23 @@ def Affichage_points_collecte_t(Pt_toile, Pt_ancrage, Ressort, nb_frame, ind_mas
     return ax
 
 
-def velocity_from_finite_difference(Pt_before, Pt_after, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
+def velocity_from_finite_difference(Pt_interpoles,  idx_before, idx_after):
     """
     Approximates the velocity of the markers using the finite difference method.
     """
-    position_imoins1 = interpolation_collecte(Pt_before, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
-    position_iplus1 = interpolation_collecte(Pt_after, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
+    position_imoins1 = Pt_interpoles[idx_before, :, :]
+    position_iplus1 = Pt_interpoles[idx_after, :, :]
     distance_xyz = position_iplus1 - position_imoins1
     approx_velocity = distance_xyz / (2 * 0.002)
     return approx_velocity
 
 
-def integration_error(Pt_intergres, Pt_frame2, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
+def integration_error(Pt_intergres, Pt_interpoles):
     """
     Computes the error between the point positions computed from integration and the actual markers
     """
 
-    position_iplus1 = interpolation_collecte(Pt_frame2, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
+    position_iplus1 = Pt_interpoles
     point_theorique = position_iplus1.T
 
     err_rel = (np.abs(point_theorique - Pt_intergres) / point_theorique)
@@ -1315,16 +1315,15 @@ def multiple_shooting_euler_integration(nb_frame, Pt_interpoles, Pt_ancrage, lab
     relative_error, absolute_error = [], []
 
     # Velocity of the second frame by finite difference
-    current_velocity = velocity_from_finite_difference(Pt_interpoles[0], Pt_interpoles[2], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
+    current_velocity = velocity_from_finite_difference(Pt_interpoles, idx_before=0, idx_after=2)
     Velocity_tot[0, :, :] = current_velocity.T
 
-    Pt_tot[0, :, :] = interpolation_collecte(Pt_interpoles[0], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels).T
+    Pt_tot[0, :, :] = Pt_interpoles[0].T
 
     for frame in range(nb_frame - 1):
 
         # --- At the current frame ---#
-        Pt_interpolated = interpolation_collecte(Pt_interpoles[frame], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
-        bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt_interpolated)
+        bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt_interpoles[frame])
 
         # Computation the forces based on the state of the model
         M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
@@ -1338,12 +1337,12 @@ def multiple_shooting_euler_integration(nb_frame, Pt_interpoles, Pt_ancrage, lab
         for i in range(0, n * m):
             accel_current[i, :] = F_point[i, :] / M[i]
             velocity_next[i, :] = dt * accel_current[i, :] + current_velocity[i, :]
-            Pt_integ[i, :] = dt * Velocity_tot[frame, i, :] + Pt_interpolated.T[i, :]
+            Pt_integ[i, :] = dt * Velocity_tot[frame, i, :] + Pt_interpoles[frame][i, :]
 
         # Make sure the intial velocity approximation does not have too much of an effect on the integration
         # by regularizing with the finite difference velocity
-        if frame == 1:
-            velocity_next = (initial_velocity + velocity_next) / 2
+        # if frame == 1:
+        #     velocity_next = (initial_velocity + velocity_next) / 2
 
         Pt_tot[frame+1, :, :] = Pt_integ
         Velocity_tot[frame+1, :, :] = velocity_next
@@ -1428,7 +1427,7 @@ def multiple_shooting_integration(nb_frame, Pt_interpoles, labels):
     # solver = scipy.integrate.ode(fun)
     # solver.set_integrator('dop853')
 
-    def dyn_fun(x, t):
+    def dyn_fun(t, x):
         """
         x = [p, v]
         dx = [v, dv]
@@ -1452,23 +1451,18 @@ def multiple_shooting_integration(nb_frame, Pt_interpoles, labels):
     relative_error, absolute_error = [], []
 
     # Velocity of the second frame by finite difference
-    current_velocity = velocity_from_finite_difference(Pt_interpoles[0], Pt_interpoles[2], labels)
-    Velocity_tot[0, :, :] = current_velocity.T
-
-    Pt_interpolated = np.zeros((nb_frame, n * m, 3))
-    for frame in range(nb_frame):
-        Pt_interpolated[frame, :, :] = interpolation_collecte(Pt_interpoles[frame], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels).T
-    Pt_tot[0, :, :] = interpolation_collecte(Pt_interpoles[0], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels).T
+    current_velocity = velocity_from_finite_difference(Pt_interpoles, idx_before=0, idx_after=2)
+    Velocity_tot[0, :, :] = current_velocity
+    Pt_tot[0, :, :] = Pt_interpoles[0]
 
     for frame in range(nb_frame - 1):
 
         # --- At the current frame ---#
         if frame == 0:
-            current_velocity = velocity_from_finite_difference(Pt_interpoles[frame], Pt_interpoles[frame+1], labels) * dt
+            current_velocity = velocity_from_finite_difference(Pt_interpoles, idx_before=frame, idx_after=frame+1) * dt
         else:
-            current_velocity = velocity_from_finite_difference(Pt_interpoles[frame - 1], Pt_interpoles[frame + 1],
-                                                               labels)
-        Velocity_tot[frame, :, :] = current_velocity.T
+            current_velocity = velocity_from_finite_difference(Pt_interpoles, idx_before=frame-1, idx_after=frame+1)
+        Velocity_tot[frame, :, :] = current_velocity
 
         # Computation the forces based on the state of the model
         # M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
@@ -1480,7 +1474,7 @@ def multiple_shooting_integration(nb_frame, Pt_interpoles, labels):
         # Pt_interpolated.T[24, :] = Pt_interpolated.T.flatten()[24*3:25*3]
         # Velocity_tot[frame, :, :][24, :] = Velocity_tot[frame, :, :].flatten()[24 * 3:25 * 3]
 
-        y0 = np.hstack((Pt_interpolated[frame, :, :].T.flatten(), Velocity_tot[frame, :, :].flatten()))
+        y0 = np.hstack((Pt_interpoles[frame, :, :].T.flatten(), Velocity_tot[frame, :, :].flatten()))
         sol = scipy.integrate.solve_ivp(dyn_fun,
                                         t_span=[0, dt],
                                         y0=y0,
@@ -1488,12 +1482,12 @@ def multiple_shooting_integration(nb_frame, Pt_interpoles, labels):
         position_diff = sol[0]
         velocity_diff = sol[1]
         velocity_next = current_velocity + velocity_diff
-        Pt_integ = Pt_interpolated.T + position_diff
+        Pt_integ = Pt_interpoles[frame].T + position_diff
 
         # Make sure the intial velocity approximation does not have too much of an effect on the integration
         # by regularizing with the finite difference velocity
-        if frame == 1:
-            velocity_next = (initial_velocity + velocity_next) / 2
+        # if frame == 1:
+        #     velocity_next = (initial_velocity + velocity_next) / 2
 
         Pt_tot[frame + 1, :, :] = Pt_integ
         Velocity_tot[frame + 1, :, :] = velocity_next

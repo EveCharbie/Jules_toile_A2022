@@ -1,23 +1,23 @@
 """
-Optimisation des k en single shooting, et des masses du centre pour voir la répartition de la masse du disque sur les 5 points concernés
+Optimization of the elasticity coefficents (K) and of the repartition of the applied mass (M) on the 5 points of the trampoline bed.
 
-On load 35 fichier c3d pour avoir les informations de 80% des essais collectés, puis a partir de ca on définit tous les parametres fixes du trampoline.
-On considere que les parametres variables sont ;
--les raideurs des ressorts
--les masses des 5 points sur lesquels le disque est posé
-L'objectif :
--minimiser la résultante des forces en chacun des 135 points des 35 essais
--minimiser la différence entre la position des points de collecte et la position du modele des 35 essais
--reguler les k obliques
+First, 35 c3d files containing experimental positions are loaded (these 35 trials compose the learning pool; 80% of the trials)
+Then the K are optimized to match all the trials at once.
 
-Les contraintes :
--la somme des 5 masses appliquée au niveau des points en contact avec le disque est égale a la masse du disque (pour chacun des essais)
+Optimization variables:
+    - K (elasticity coefficients)
+    - M (applied mass on the 5 points of the trampoline bed)
+    - X (position of the 135 points of the trampoline bed)
 
-L'optimisation renvoie alors :
--la valeur des k et des 5 masses
--les coordonnées des 135 points des 35 essais
--le label du point sur lequel le disque est posé
+Objectives:
+    - Minimize the forces on the 135 points of the trampoline bed
+    - Minimize the difference between the position of the points and the model
+    - Regularization of the diagonal springs (redondant model)
 
+Constraints:
+    - The 5 masses must equal the total mass applied on the trampoline using mass plates
+
+The evaluation of the k on the test pool is done in the file: Statique/Verif_optim_position_k_fixe.py
 """
 
 import casadi as cas
