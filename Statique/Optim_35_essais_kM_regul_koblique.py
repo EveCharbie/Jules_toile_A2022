@@ -1055,7 +1055,7 @@ def tab2list(tab):
     return list
 
 
-def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, optimize_static_mass):
+def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
     k, k_croix = Param_variable(K)
     M = Param_variable_masse(ind_masse, Ma)
     Pt = list2tab(X)
@@ -1070,48 +1070,48 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, optimize_sta
     index_of_the_point_subject_to_masses = [ind_masse, ind_masse + 1, ind_masse - 1, ind_masse + 15, ind_masse - 15]
     F_totale = cas.MX.zeros(3)
     for ind in range(F_point.shape[0]):
-        if ind in index_of_the_point_subject_to_masses and optimize_static_mass == False:
-            continue
-        else:
-            for i in range(3):
-                F_totale[i] += F_point[ind, i]
+        for i in range(3):
+            F_totale[i] += F_point[ind, i]
 
     return F_totale, F_point
 
 
-def a_minimiser(X, K, Ma, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, ind_masse, optimize_static_mass):
-    F_totale, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, optimize_static_mass)
+def a_minimiser(X, K, Ma, Pt_collecte, Pt_ancrage, Pt_interpolated, dict_fixed_params, labels, ind_masse, optimize_static_mass):
+    F_totale, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma)
     Pt = list2tab(X)
-    Pt_inter = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
 
     Difference = cas.MX.zeros(1)
     for i in range(3):
         for ind in range(n * m):
-            Difference += (F_point[ind, i]) ** 2
+
             if "t" + str(ind) in labels:
                 ind_collecte = labels.index("t" + str(ind))  # ATTENTION gérer les nans
                 if np.isnan(Pt_collecte[i, ind_collecte]):  # gérer les nans
                     Difference += (
-                        0.01 * (Pt[ind, i] - Pt_inter[i, ind_collecte]) ** 2
+                        0.01 * (Pt[ind, i] - Pt_interpolated[i, ind]) ** 2
                     )  # on donne un poids moins important aux données interpolées
-                elif (
-                    ind == ind_masse
-                    or ind == ind_masse - 1
-                    or ind == ind_masse + 1
-                    or ind == ind_masse - 15
-                    or ind == ind_masse + 15
-                ):
-                    Difference += 500 * (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
+                elif ind in [ind_masse, ind_masse-1, ind_masse+1, ind_masse-15, ind_masse+15]:
+                    if optimize_static_mass:
+                        Difference += 500 * (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
+                    else:
+                        Difference += (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
                 else:
                     Difference += (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
+            else:
+                Difference += 0.01 * (Pt[ind, i] - Pt_interpolated[i, ind]) ** 2
+
+            # if not optimize_static_mass:
+            #     if ind not in [ind_masse, ind_masse-1, ind_masse+1, ind_masse-15, ind_masse+15]:
+            #         Difference += (F_point[ind, i]) ** 2
+            # else:
+                Difference += (F_point[ind, i]) ** 2
 
     if type(K) == cas.MX:
         regul_k = K[8] ** 2 + K[9] ** 2 + K[10] ** 2 + K[11] ** 2
         output = (1e4) * Difference + (1e-6) * regul_k
         obj = cas.Function("f", [X, K, Ma], [output]).expand()
     else:
-        output = (1e4) * Difference
-        obj = cas.Function("f", [X, Ma], [output]).expand()
+        obj = cas.Function("f", [X, Ma], [1e-6 * Difference]).expand()
 
     return obj
 
@@ -1228,7 +1228,7 @@ def get_list_results_static(participant, trial_name, frame, dict_fixed_params):
                 ubw_Pt += [0.5]
                 w0_Pt += [Pt_interpolated[2, int(k // 3)]]
 
-        return w0_Pt, lbw_Pt, ubw_Pt
+        return w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated
 
 
 def Optimisation(
@@ -1282,7 +1282,7 @@ def Optimisation(
         w += [Ma]
 
         # X
-        w0_Pt, lbw_Pt, ubw_Pt = Pt_bounds(
+        w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated = Pt_bounds(
             initial_guess, Pt_collecte[i], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels[i]
         )
         lbw += lbw_Pt
@@ -1302,6 +1302,7 @@ def Optimisation(
             Ma,
             Pt_collecte[i],
             Pt_ancrage[i],
+            Pt_interpolated,
             dict_fixed_params,
             labels[i],
             ind_masse[i],

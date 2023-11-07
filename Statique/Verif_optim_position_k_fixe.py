@@ -178,7 +178,7 @@ def Optimisation(
     w += [Ma]
 
     # X
-    w0_Pt, lbw_Pt, ubw_Pt = Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
+    w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated, Pt_ancrage_interpolated = Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
     lbw += lbw_Pt
     ubw += ubw_Pt
     w0 += w0_Pt
@@ -196,7 +196,8 @@ def Optimisation(
         K,
         Ma,
         Pt_collecte,
-        Pt_ancrage,
+        Pt_ancrage_interpolated,
+        Pt_interpolated,
         dict_fixed_params,
         labels,
         ind_masse,

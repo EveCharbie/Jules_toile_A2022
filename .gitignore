@@ -14,3 +14,5 @@ Plots/
 .idea/
 
 __pycache__/
+
+Dynamique/results_multiple_static_optim_in_a_row/

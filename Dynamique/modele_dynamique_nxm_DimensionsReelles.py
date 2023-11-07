@@ -603,7 +603,7 @@ def rotation_points(Pt_ancrage, Pt_repos):
 
 
 def static_forces_calc(
-    Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2
+    Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2, dict_fixed_params
 ):  # force en chaque ressort
     k, k_oblique, M, C = Param()
     l_repos = dict_fixed_params["l_repos"]
@@ -1112,19 +1112,19 @@ def Point_toile_init(Point_collecte, labels):
                 label_toile.append(lab)
     return point_toile, label_toile
 
-
-def surface_interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels, with_plot=False):
+def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels, with_plot=False):
     """
     Interpolate to fill the missing markers.
     """
 
-    Pt_interpolated = np.zeros((len(Pt_collecte_tab), m * n, 3))
+    Pt_interpolated = np.zeros((len(Pt_collecte), m * n, 3))
     Pt_interpolated[:, :, :] = np.nan
-    Pt_ancrage_interpolated = np.zeros((len(Pt_collecte_tab), 2 * (m + n), 3))
+    Pt_ancrage_interpolated = np.zeros((len(Pt_collecte), 2 * (m + n), 3))
     Pt_ancrage_interpolated[:, :, :] = np.nan
-    Pt_needs_interpolation = np.ones((len(Pt_collecte_tab), m * n, 3))
-    Pt_ancrage_need_interpolation = np.ones((len(Pt_collecte_tab), 2 * (m + n), 3))
-    for frame in range(len(Pt_collecte_tab)):
+    Pt_needs_interpolation = np.ones((len(Pt_collecte), m * n, 3))
+    Pt_ancrage_need_interpolation = np.ones((len(Pt_collecte), 2 * (m + n), 3))
+    mean_position_ancrage = np.zeros((len(Pt_collecte), 3))
+    for frame in range(len(Pt_collecte)):
         if with_plot:
             fig = plt.figure(1)
             ax = fig.add_subplot(111, projection="3d")
@@ -1132,8 +1132,8 @@ def surface_interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_anc
 
         # Fill markers data that we have
         for ind in range(m * n):
-            if "t" + str(ind) in labels and np.isnan(Pt_collecte_tab[frame][0, labels.index("t" + str(ind))]) == False:
-                Pt_interpolated[frame, ind, :] = Pt_collecte_tab[frame][:, labels.index("t" + str(ind))]
+            if np.isnan(Pt_collecte[frame][0, ind]) == False:
+                Pt_interpolated[frame, ind, :] = Pt_collecte[frame][:, ind]
                 Pt_needs_interpolation[frame, ind, :] = 0
                 if with_plot:
                     ax.plot(
@@ -1142,8 +1142,9 @@ def surface_interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_anc
                         Pt_interpolated[frame, ind, 2],
                         ".b",
                     )
-            elif "C" + str(ind) in labels and np.isnan(Pt_ancrage[frame, labels.index("C" + str(ind)), 0]) == False:
-                Pt_ancrage_interpolated[frame, ind, :] = Pt_ancrage[frame, labels.index("C" + str(ind)), :]
+        for ind in range(2*(m+n)):
+            if np.isnan(Pt_ancrage[frame][ind, 0]) == False:
+                Pt_ancrage_interpolated[frame, ind, :] = Pt_ancrage[frame][ind, :]
                 Pt_ancrage_need_interpolation[frame, ind, :] = 0
                 if with_plot:
                     ax.plot(
@@ -1152,6 +1153,9 @@ def surface_interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_anc
                         Pt_ancrage_interpolated[frame, ind, 2],
                         "ob",
                     )
+
+        known_indices_ancrage = np.where(Pt_ancrage_need_interpolation[frame, :, 0] == 0)[0]
+        mean_position_ancrage[frame, :] = np.mean(Pt_ancrage_interpolated[frame, known_indices_ancrage, :])
 
         known_indices = np.where(Pt_needs_interpolation[frame, :, 0] == 0)[0]
         missing_indices = np.where(Pt_needs_interpolation[frame, :, 0] == 1)[0]
@@ -1208,10 +1212,19 @@ def surface_interpolation_collecte(Pt_collecte_tab, Pt_ancrage, Pt_repos, Pt_anc
         Pt_interpolated[frame, missing_indices, :2] = Pt_repos[missing_indices, :2]
         Pt_interpolated[frame, missing_indices, 2] = Z_new[:, 0]
 
-    return Pt_interpolated
+    mean_mean_position_ancrage = np.mean(mean_position_ancrage, axis=0)
+    mean_position_ancrage = mean_position_ancrage - mean_mean_position_ancrage
+    mean_position_ancrage = mean_position_ancrage.reshape(len(Pt_collecte), 3)
+    for frame in range(len(Pt_collecte)):
+        for ind in range(2 * (m + n)):
+            if np.isnan(Pt_ancrage_interpolated[frame, ind, 0]):
+                Pt_ancrage_interpolated[frame, ind, :2] = Pt_ancrage_repos[ind, :2]
+                Pt_ancrage_interpolated[frame, ind, 2] = Pt_ancrage_repos[ind, 2] + mean_position_ancrage[frame][2]
+
+    return Pt_interpolated, Pt_ancrage_interpolated
 
 
-def spring_bouts_collecte(Pt_interpolated):
+def spring_bouts_collecte(Pt_interpolated, Pt_ancrage_repos):
     """
     Returns the coordinates of the spring ends from the markers coordinates (linking the right markers together).
     """
@@ -1228,7 +1241,7 @@ def Affichage_points_collecte_t(Pt_toile, Pt_ancrage, Ressort, nb_frame, ind_mas
     :param ressort: Booleen, if true on affiche les ressorts
 
     """
-    bout1, bout2, boutc1, boutc2 = spring_bouts_collecte(Pt_toile)
+    bout1, bout2, boutc1, boutc2 = spring_bouts_collecte(Pt_toile, Pt_ancrage)
 
     fig = plt.figure(0)
     ax = fig.add_subplot(111, projection="3d")
@@ -1286,8 +1299,8 @@ def velocity_from_finite_difference(Pt_interpoles, idx_before, idx_after):
     """
     Approximates the velocity of the markers using the finite difference method.
     """
-    position_imoins1 = Pt_interpoles[idx_before, :, :]
-    position_iplus1 = Pt_interpoles[idx_after, :, :]
+    position_imoins1 = Pt_interpoles[idx_before]
+    position_iplus1 = Pt_interpoles[idx_after]
     distance_xyz = position_iplus1 - position_imoins1
     approx_velocity = distance_xyz / (2 * 0.002)
     return approx_velocity
@@ -1350,10 +1363,10 @@ def multiple_shooting_euler_integration(nb_frame, Pt_interpoles, Pt_ancrage, lab
 
     for frame in range(nb_frame - 1):
         # --- At the current frame ---#
-        bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt_interpoles[frame])
+        bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt_interpoles[frame], Pt_ancrage)
 
         # Computation the forces based on the state of the model
-        M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
+        M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2, dict_fixed_params)
         F_point = static_force_in_each_point(F_spring, F_spring_croix, F_masses)
 
         F_all_point[frame, :, :] = F_point
@@ -1381,7 +1394,7 @@ def multiple_shooting_euler_integration(nb_frame, Pt_interpoles, Pt_ancrage, lab
     return Pt_tot, Velocity_tot, erreur_relative, erreur_absolue, F_all_point
 
 
-def single_shooting_euler_integration(nb_frame, Pt_interpoles, labels):
+def single_shooting_euler_integration(nb_frame, Pt_interpoles, Pt_ancrage_interpoles, labels):
     """
     Computes the position of the points by integrating (from the forces and initial conditions)
     -------
@@ -1404,10 +1417,10 @@ def single_shooting_euler_integration(nb_frame, Pt_interpoles, labels):
 
     for frame in range(nb_frame - 1):
         # --- At the current frame ---#
-        bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt_tot[frame])
+        bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt_tot[frame], Pt_ancrage_interpoles)
 
         # Computation the forces based on the state of the model
-        M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
+        M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2, dict_fixed_params)
         F_point = static_force_in_each_point(F_spring, F_spring_croix, F_masses)
 
         F_all_point[frame, :, :] = F_point
@@ -1435,12 +1448,12 @@ def single_shooting_euler_integration(nb_frame, Pt_interpoles, labels):
     return Pt_tot, erreur_relative, erreur_absolue, F_all_point, v_all
 
 
-def multiple_shooting_integration(nb_frame, Pt_interpoles):
+def multiple_shooting_integration(nb_frame, Pt_interpoles, Pt_ancrage_interpoles, dict_fixed_params):
     """
     Computes the position of the points by integrating (from the forces and initial conditions).
     """
 
-    def dyn_fun(t, y):
+    def dyn_fun(t, y, Pt_ancrage_interpoles):
         """
         x = [p, v]
         dx = [v, dv]
@@ -1448,8 +1461,8 @@ def multiple_shooting_integration(nb_frame, Pt_interpoles):
         p = y[: m * n * 3].reshape(m * n, 3)
         v = y[m * n * 3 :].reshape(m * n, 3)
 
-        bt1, bt2, btc1, btc2 = spring_bouts_collecte(p.T)
-        M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2)
+        bt1, bt2, btc1, btc2 = spring_bouts_collecte(p.T, Pt_ancrage_interpoles)
+        M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2, dict_fixed_params)
         F_point = static_force_in_each_point(F_spring, F_spring_croix, F_masses)
         accel_current = np.zeros((n * m, 3))
         for i in range(0, n * m):
@@ -1479,7 +1492,7 @@ def multiple_shooting_integration(nb_frame, Pt_interpoles):
         Velocity_tot[frame, :, :] = current_velocity
 
         y0 = np.hstack((Pt_interpoles[frame, :, :].T.flatten(), Velocity_tot[frame, :, :].flatten()))
-        sol = scipy.integrate.solve_ivp(dyn_fun, t_span=[0, dt], y0=y0, method="DOP853")
+        sol = scipy.integrate.solve_ivp(fun=lambda t, y: dyn_fun(t, y, Pt_ancrage_interpoles[frame]), t_span=[0, dt], y0=y0, method="DOP853")
         position_diff = sol.y[: m * n * 3, -1].reshape(m * n, 3)
         velocity_diff = sol.y[m * n * 3 :, -1].reshape(m * n, 3)
         velocity_next = current_velocity + velocity_diff
@@ -1561,13 +1574,13 @@ def main():
     Pt_ancrage_collecte, labels_ancrage = Point_ancrage(Pt_collecte_tab, labels)
     Pt_toile_collecte, label_toile = Point_toile_init(Pt_collecte_tab, labels)
 
-    Pt_interpoles = surface_interpolation_collecte(
-        Pt_collecte_tab, Pt_ancrage_collecte, Pt_repos, Pt_ancrage_repos, labels
+    Pt_interpoles, Pt_ancrage_interpolated = surface_interpolation_collecte(
+        Pt_toile_collecte, Pt_ancrage_collecte, Pt_repos, Pt_ancrage_repos, labels
     )
 
     # Pt_integres, erreur_relative, erreur_absolue, static_force_in_each_points, v_all = multiple_shooting_euler_integration(nb_frame, Pt_interpoles, labels, Masse_centre)
     Pt_integres, erreur_relative, erreur_absolue, static_force_in_each_points, v_all = multiple_shooting_integration(
-        nb_frame, Pt_interpoles
+        nb_frame, Pt_interpoles, Pt_ancrage_interpolated, dict_fixed_params
     )
 
     # Plot the position of the markers vs model points at the initial instant

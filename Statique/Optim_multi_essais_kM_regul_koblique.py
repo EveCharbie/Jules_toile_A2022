@@ -39,7 +39,7 @@ from enums import InitialGuessType
 from Optim_35_essais_kM_regul_koblique import interpolation_collecte, a_minimiser, Param_fixe
 
 sys.path.append("../Dynamique/")
-from modele_dynamique_nxm_DimensionsReelles import surface_interpolation_collecte
+from modele_dynamique_nxm_DimensionsReelles import surface_interpolation_collecte, Points_ancrage_repos
 
 
 n = 15  # nombre de mailles sur le grand cote
@@ -100,13 +100,15 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
     """
 
     if initial_guess == InitialGuessType.LINEAR_INTERPOLATION:
-        Pt_interpolated = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
+        Pt_interpolated, Pt_ancrage_interpolated = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
     elif initial_guess == InitialGuessType.RESTING_POSITION:
-        Pt_interpolated = Pt_repos
+        Pt_interpolated, Pt_ancrage_interpolated = Pt_repos, Pt_ancrage_repos
     elif initial_guess == InitialGuessType.SURFACE_INTERPOLATION:
-        Pt_interpolated = surface_interpolation_collecte(
-            [Pt_collecte], [Pt_ancrage], Pt_repos, Pt_ancrage_repos, [labels]
-        )[0, :, :].T
+        Pt_interpolated, Pt_ancrage_interpolated = surface_interpolation_collecte(
+            [Pt_collecte], [Pt_ancrage], Pt_repos, Pt_ancrage_repos, labels, True
+        )
+        Pt_interpolated = Pt_interpolated[0,:,:].T
+        Pt_ancrage_interpolated = Pt_ancrage_interpolated[0, :, :]
     else:
         raise RuntimeError(f"The interpolation type of the initial guess {initial_guess} is not recognized.")
 
@@ -129,7 +131,7 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
             ubw_Pt += [0.5]
             w0_Pt += [Pt_interpolated[2, int(k // 3)]]
 
-    return w0_Pt, lbw_Pt, ubw_Pt
+    return w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated, Pt_ancrage_interpolated
 
 
 def Optimisation(
@@ -147,6 +149,7 @@ def Optimisation(
     # PARAM FIXES
     n = 15
     m = 9
+    Pt_ancrage_repos, Pt_repos = Points_ancrage_repos(dict_fixed_params)
 
     # OPTIMISATION :
     # Start with an empty NLP
@@ -182,7 +185,7 @@ def Optimisation(
         w += [Ma]
 
         # X
-        w0_Pt, lbw_Pt, ubw_Pt = Pt_bounds(
+        w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated = Pt_bounds(
             initial_guess, Pt_collecte[i], Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels[i]
         )
         lbw += lbw_Pt
@@ -202,6 +205,7 @@ def Optimisation(
             Ma,
             Pt_collecte[i],
             Pt_ancrage[i],
+            Pt_interpolated,
             dict_fixed_params,
             labels[i],
             ind_masse[i],
