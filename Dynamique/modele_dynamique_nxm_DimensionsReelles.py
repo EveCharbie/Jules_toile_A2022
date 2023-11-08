@@ -525,7 +525,7 @@ def static_forces_calc(
         Vect_unit_dir_F[i, :] = (Spring_bout_2[i, :] - Spring_bout_1[i, :]) / np.linalg.norm(
             Spring_bout_2[i, :] - Spring_bout_1[i, :]
         )
-    # Vect_unit_dir_F = (Spring_bout_2 - Spring_bout_1) / cas.norm_fro(Spring_bout_2 - Spring_bout_1)
+
     for ispring in range(Nb_ressorts):
         F_spring[ispring, :] = (
             Vect_unit_dir_F[ispring, :]
@@ -1064,8 +1064,9 @@ def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage
                     tck, u = scipy.interpolate.splprep([Pt_column_i[non_nan_idx, 0], Pt_column_i[non_nan_idx, 1], Pt_column_i[non_nan_idx, 2]], k=degree)
                     new_points = scipy.interpolate.splev(t_new, tck)
                     curves_to_plot = scipy.interpolate.splev(np.linspace(0, 1, 100), tck)
-                    ax.plot(curves_to_plot[0], curves_to_plot[1], curves_to_plot[2], "g")
-                    ax.plot(new_points[0], new_points[1], new_points[2], ".g")
+                    if with_plot:
+                        ax.plot(curves_to_plot[0], curves_to_plot[1], curves_to_plot[2], "g")
+                        ax.plot(new_points[0], new_points[1], new_points[2], ".g")
                     idx_added = 0
                     for idx_to_add in range(n+2):
                         if idx_to_add in nan_idx and idx_to_add != 0 and idx_to_add != n+1:
@@ -1110,8 +1111,9 @@ def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage
                         k=degree)
                     new_points = scipy.interpolate.splev(t_new, tck)
                     curves_to_plot = scipy.interpolate.splev(np.linspace(0, 1, 100), tck)
-                    ax.plot(curves_to_plot[0], curves_to_plot[1], curves_to_plot[2], "m")
-                    ax.plot(new_points[0], new_points[1], new_points[2], ".m")
+                    if with_plot:
+                        ax.plot(curves_to_plot[0], curves_to_plot[1], curves_to_plot[2], "m")
+                        ax.plot(new_points[0], new_points[1], new_points[2], ".m")
                     idx_added = 0
                     for idx_to_add in range(m + 2):
                         if idx_to_add in nan_idx and idx_to_add != 0 and idx_to_add != m + 1:
@@ -1119,6 +1121,9 @@ def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage
                             Pt_row_interpolated[n * (idx_to_add - 1) + i, 1] = new_points[1][idx_added]
                             Pt_row_interpolated[n * (idx_to_add - 1) + i, 2] = new_points[2][idx_added]
                             idx_added += 1
+
+
+        grid_from_row_and_columns = np.mean(np.concatenate((Pt_row_interpolated.reshape(m*n, 3, 1), Pt_column_interpolated.reshape(m*n, 3, 1)), axis=2), axis=2)
 
         # Fit a polynomial surface to the points that we have
         degree = 10
@@ -1134,13 +1139,13 @@ def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage
         )
 
         # Approximate the position of the missing markers + plot
-        Z_new = model.predict(Pt_repos[missing_indices, :2])
+        Z_new = model.predict(grid_from_row_and_columns[missing_indices, :2])
         Z_new[np.where(Z_new > 0.01)] = 0.01
 
         if with_plot:
             ax.scatter(
-                Pt_repos[missing_indices, 0],
-                Pt_repos[missing_indices, 1],
+                grid_from_row_and_columns[missing_indices, 0],
+                grid_from_row_and_columns[missing_indices, 1],
                 Z_new,
                 marker="x",
                 color="r",
@@ -1170,7 +1175,7 @@ def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage
                 plt.savefig("../Plots/interpolaion_frame_" + str(frame) + ".png")
             plt.show()
 
-        Pt_interpolated[frame, missing_indices, :2] = Pt_repos[missing_indices, :2]
+        Pt_interpolated[frame, missing_indices, :2] = grid_from_row_and_columns[missing_indices, :2]
         Pt_interpolated[frame, missing_indices, 2] = Z_new[:, 0]
 
     mean_mean_position_ancrage = np.mean(mean_position_ancrage, axis=0)
