@@ -57,13 +57,13 @@ def F_bounds():
     ubw_F = np.ones((5*3)) * 10000
     return w0_F, lbw_F, ubw_F
 
-def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
+def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, dict_fixed_params):
     """
     Returns the bounds on the position of the points of the model based on the interpolation of the missing points.
     """
     if initial_guess == InitialGuessType.SURFACE_INTERPOLATION:
         Pt_interpolated, Pt_ancrage_interpolated = surface_interpolation_collecte(
-            [Pt_collecte], [Pt_ancrage], Pt_repos, Pt_ancrage_repos, labels, False
+            [Pt_collecte], [Pt_ancrage], Pt_repos, Pt_ancrage_repos, dict_fixed_params, False
         )
         Pt_interpolated = Pt_interpolated[0,:,:].T
         Pt_ancrage_interpolated = Pt_ancrage_interpolated[0, :, :]
@@ -104,16 +104,8 @@ def a_minimiser(X, K, Ma, F_athl, Pt_collecte, Pt_ancrage, Pt_interpolated, dict
 
             if "t" + str(ind) in labels:
                 ind_collecte = labels.index("t" + str(ind))  # ATTENTION gérer les nans
-                if np.isnan(Pt_collecte[i, ind_collecte]):  # gérer les nans
-                    Difference += (
-                        0.01 * (Pt[ind, i] - Pt_interpolated[i, ind]) ** 2
-                    )  # on donne un poids moins important aux données interpolées
-                elif ind in [ind_masse, ind_masse-1, ind_masse+1, ind_masse-15, ind_masse+15]:
-                    Difference += (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
-                else:
+                if not np.isnan(Pt_collecte[i, ind_collecte]):  # gérer les nans
                     Difference += 500 * (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
-            else:
-                Difference += 0.01 * (Pt[ind, i] - Pt_interpolated[i, ind]) ** 2
 
             if ind in [ind_masse, ind_masse-1, ind_masse+1, ind_masse-15, ind_masse+15]:
                 if i == 2:
@@ -165,7 +157,7 @@ def Optimisation(
     w += [Ma]
 
     # X
-    w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated, Pt_ancrage_interpolated = Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels)
+    w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated, Pt_ancrage_interpolated = Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, dict_fixed_params)
     lbw += lbw_Pt
     ubw += ubw_Pt
     w0 += w0_Pt
@@ -300,12 +292,12 @@ def main():
         ax.set_box_aspect([1.1, 1.8, 1])
         ax.plot(0, 0, -1.2, "ow")
 
-        ax.plot(Pt_interpolated[0, :],
-                Pt_interpolated[1, :],
-                Pt_interpolated[2, :],
-                "xb",
-                label="initial guess"
-                )
+        # ax.plot(Pt_interpolated[0, :],
+        #         Pt_interpolated[1, :],
+        #         Pt_interpolated[2, :],
+        #         "xb",
+        #         label="initial guess"
+        #         )
 
         ax.plot(
             Pt_ancrage_interpolated[:, 0],
@@ -352,11 +344,17 @@ def main():
             label="Optimized point positions",
         )
 
-        for ind in range(m*n):
-            plt.plot(np.vstack((Pt[ind, 0], Pt[ind, 0] + F_point[ind, 0] / 100000)),
-                     np.vstack((Pt[ind, 1], Pt[ind, 1] + F_point[ind, 1] / 100000)),
-                     np.vstack((Pt[ind, 2], Pt[ind, 2] + F_point[ind, 2] / 100000)),
-                     "-r")
+        # for ind in range(m*n):
+        #     plt.plot(np.vstack((Pt[ind, 0], Pt[ind, 0] + F_point[ind, 0] / 100000)),
+        #              np.vstack((Pt[ind, 1], Pt[ind, 1] + F_point[ind, 1] / 100000)),
+        #              np.vstack((Pt[ind, 2], Pt[ind, 2] + F_point[ind, 2] / 100000)),
+        #              "-r")
+        #
+        # for ind, index in enumerate([ind_masse, ind_masse-1, ind_masse+1, ind_masse-15, ind_masse+15]):
+        #     plt.plot(np.vstack((Pt[index, 0], Pt[index, 0] + F_athl[ind, 0] / 100000)),
+        #              np.vstack((Pt[index, 1], Pt[index, 1] + F_athl[ind, 1] / 100000)),
+        #              np.vstack((Pt[index, 2], Pt[index, 2] + F_athl[ind, 2] / 100000)),
+        #              "-m")
 
         ax.legend()
         plt.savefig(f"results_multiple_static_optim_in_a_row/solution_frame{frame}_{ends_with}.png")
