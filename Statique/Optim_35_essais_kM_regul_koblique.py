@@ -1196,6 +1196,7 @@ def get_list_results_static(participant, trial_name, frame, dict_fixed_params):
     def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
         """
         Returns the bounds on the position of the points of the model based on the interpolation of the missing points.
+        Do not use this, instead see Optim_multi_essais_kM_regul_koblique.py
         """
 
         if isinstance(initial_guess, InitialGuessType.LINEAR_INTERPOLATION):

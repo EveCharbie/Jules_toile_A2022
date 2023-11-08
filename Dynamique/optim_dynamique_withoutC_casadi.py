@@ -28,8 +28,17 @@ from enums import InitialGuessType
 
 sys.path.append("../Statique/")
 from Optim_35_essais_kM_regul_koblique import Param_fixe, Calcul_Pt_F, list2tab
-from modele_dynamique_nxm_DimensionsReelles import Resultat_PF_collecte, Point_ancrage, Point_toile_init, Points_ancrage_repos
-from Optim_multi_essais_kM_regul_koblique import Pt_bounds, m_bounds
+from modele_dynamique_nxm_DimensionsReelles import (
+    Resultat_PF_collecte,
+    Point_ancrage,
+    Point_toile_init,
+    Points_ancrage_repos,
+    surface_interpolation_collecte,
+    spring_bouts_collecte,
+    static_forces_calc,
+    static_force_in_each_point,
+)
+from Optim_multi_essais_kM_regul_koblique import m_bounds
 from Verif_optim_position_k_fixe import Param_variable
 
 def get_list_results_dynamic(participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval):
@@ -44,23 +53,48 @@ def get_list_results_dynamic(participant, static_trial_name, empty_trial_name, t
 
 def F_bounds():
     w0_F = np.zeros((5*3))
-    lbw_F = np.ones((5*3)) * -1000
-    ubw_F = np.ones((5*3)) * 1000
+    lbw_F = np.ones((5*3)) * -10000
+    ubw_F = np.ones((5*3)) * 10000
     return w0_F, lbw_F, ubw_F
 
+def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels):
+    """
+    Returns the bounds on the position of the points of the model based on the interpolation of the missing points.
+    """
+    if initial_guess == InitialGuessType.SURFACE_INTERPOLATION:
+        Pt_interpolated, Pt_ancrage_interpolated = surface_interpolation_collecte(
+            [Pt_collecte], [Pt_ancrage], Pt_repos, Pt_ancrage_repos, labels, False
+        )
+        Pt_interpolated = Pt_interpolated[0,:,:].T
+        Pt_ancrage_interpolated = Pt_ancrage_interpolated[0, :, :]
+    else:
+        raise RuntimeError(f"The interpolation type of the initial guess {initial_guess} is not accepted for this problem.")
 
+    # bounds and initial guess
+    lbw_Pt = []
+    ubw_Pt = []
+    w0_Pt = []
+
+    for k in range(n * m):
+        if np.isnan(Pt_collecte[0, k]):
+            lbw_Pt += [Pt_interpolated[:, k] - 0.3]
+            ubw_Pt += [Pt_interpolated[:, k] + 0.3]
+            w0_Pt += [Pt_interpolated[:, k]]
+        else:
+            lbw_Pt += [Pt_collecte[:, k] - 0.03]
+            ubw_Pt += [Pt_collecte[:, k] + 0.03]
+            w0_Pt += [Pt_collecte[:, k]]
+
+    return w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated, Pt_ancrage_interpolated
 
 def a_minimiser(X, K, Ma, F_athl, Pt_collecte, Pt_ancrage, Pt_interpolated, dict_fixed_params, labels, ind_masse):
 
-    n = 15
-    m = 9
-
     _, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma)
-    F_point[ind_masse, :] = F_athl[0:3]
-    F_point[ind_masse+1, :] = F_athl[3:6]
-    F_point[ind_masse-1, :] = F_athl[6:9]
-    F_point[ind_masse+15, :] = F_athl[9:12]
-    F_point[ind_masse-15, :] = F_athl[12:15]
+    F_point[ind_masse, :] += F_athl[0:3].T
+    F_point[ind_masse+1, :] += F_athl[3:6].T
+    F_point[ind_masse-1, :] += F_athl[6:9].T
+    F_point[ind_masse+15, :] += F_athl[9:12].T
+    F_point[ind_masse-15, :] += F_athl[12:15].T
 
     Pt = list2tab(X)
 
@@ -75,15 +109,21 @@ def a_minimiser(X, K, Ma, F_athl, Pt_collecte, Pt_ancrage, Pt_interpolated, dict
                         0.01 * (Pt[ind, i] - Pt_interpolated[i, ind]) ** 2
                     )  # on donne un poids moins important aux données interpolées
                 elif ind in [ind_masse, ind_masse-1, ind_masse+1, ind_masse-15, ind_masse+15]:
-                    Difference += 500 * (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
-                else:
                     Difference += (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
+                else:
+                    Difference += 500 * (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
             else:
                 Difference += 0.01 * (Pt[ind, i] - Pt_interpolated[i, ind]) ** 2
 
-            Difference += (F_point[ind, i]) ** 2
+            if ind in [ind_masse, ind_masse-1, ind_masse+1, ind_masse-15, ind_masse+15]:
+                if i == 2:
+                    Difference += 0.001 * (F_point[ind, i]) ** 2
+                else:
+                    Difference += (F_point[ind, i]) ** 2
+            else:
+                Difference += (F_point[ind, i]) ** 2
 
-    obj = cas.Function("f", [X, Ma, F_athl], [1e-6 * Difference]).expand()
+    obj = cas.Function("f", [X, Ma, F_athl], [Difference]).expand()
 
     return obj
 
@@ -100,8 +140,6 @@ def Optimisation(
     dict_fixed_params,
 ):
     # PARAM FIXES
-    n = 15
-    m = 9
     Pt_ancrage_repos, Pt_repos = Points_ancrage_repos(dict_fixed_params)
 
     # OPTIMISATION :
@@ -173,14 +211,11 @@ def Optimisation(
     w_opt = sol["x"].full().flatten()
     status = solver.stats()["return_status"]
 
-    return w_opt, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, sol.get("f"), status
+    return w_opt, Pt_interpolated, F_totale_collecte, ind_masse, labels, Pt_ancrage_interpolated, dict_fixed_params, sol.get("f"), status
 
 
 ##########################################################################################################################
 def main():
-
-    n = 15
-    m = 9
 
     # SELECTION OF THE RESULTS FROM THE DATA COLLECTION
     participant = 1
@@ -207,8 +242,8 @@ def main():
 
     ########################################################################################################################
 
-    for idx, frame in enumerate(jump_frame_index_interval):
-        Solution, Pt_collecte, F_totale_collecte, ind_masse, labels, Pt_ancrage, dict_fixed_params, f, status = Optimisation(
+    for idx, frame in enumerate(list(range(jump_frame_index_interval[0], jump_frame_index_interval[1]))):
+        w_opt, Pt_interpolated, F_totale_collecte, ind_masse, labels, Pt_ancrage_interpolated, dict_fixed_params, cost, status = Optimisation(
             Fs_totale_collecte[idx, :],
             Pts_collecte[idx, :, :],
             labels,
@@ -221,30 +256,114 @@ def main():
             dict_fixed_params,
         )
 
-        M = np.array(Solution[0:5])
-        Pt = np.reshape(Solution[5:-15], (n * m, 3))
-        F_athl = np.reshape(Solution[-15:], (5, 3))
+        Ma = np.array(w_opt[0:5])
+        Pt = np.reshape(w_opt[5:-15], (n * m, 3))
+        F_athl = np.reshape(w_opt[-15:], (5, 3))
+        print(F_athl)
 
         # ENREGISTREMENT PICKLE#
-        if status == 0:
+        if status == "Solve_Succeeded":
             ends_with = "CVG"
         else:
             ends_with = "DVG"
         path = f"results_multiple_static_optim_in_a_row/frame{frame}_{ends_with}.pkl"
+
         with open(path, "wb") as file:
-            pickle.dump(Solution, file)
-            pickle.dump(M, file)
-            pickle.dump(Pt, file)
-            pickle.dump(F_athl, file)
-            pickle.dump(labels, file)
-            pickle.dump(Pt_collecte, file)
-            pickle.dump(Pt_ancrage, file)
-            pickle.dump(ind_masse, file)
-            pickle.dump(f, file)
-            pickle.dump(dict_fixed_params, file)
-            pickle.dump(trial_name, file)
-            pickle.dump(frame, file)
+            data = {"w_opt": w_opt,
+                    "Ma": Ma,
+                    "Pt": Pt,
+                    "F_athl": F_athl,
+                    "labels": labels,
+                    "Pt_collecte": Pts_collecte[idx, :, :],
+                    "Pt_interpolated": Pt_interpolated,
+                    "Pt_ancrage": Pts_ancrage[idx, :, :],
+                    "Pt_ancrage_interpolated": Pt_ancrage_interpolated,
+                    "ind_masse": ind_masse,
+                    "cost": cost,
+                    "dict_fixed_params": dict_fixed_params,
+                    "trial_name": trial_name,
+                    "frame": frame,
+                    }
+            pickle.dump(data, file)
+
+        bt1, bt2, btc1, btc2 = spring_bouts_collecte(Pt.T, Pt_ancrage_interpolated)
+        M, F_spring, F_spring_croix, F_masses = static_forces_calc(bt1, bt2, btc1, btc2, dict_fixed_params)
+        F_point = static_force_in_each_point(F_spring, F_spring_croix, F_masses)
+        F_point[ind_masse, :] += F_athl[0, :]
+        F_point[ind_masse + 1, :] += F_athl[1, :]
+        F_point[ind_masse - 1, :] += F_athl[2, :]
+        F_point[ind_masse + 15, :] += F_athl[3, :]
+        F_point[ind_masse - 15, :] += F_athl[4, :]
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+        ax.set_box_aspect([1.1, 1.8, 1])
+        ax.plot(0, 0, -1.2, "ow")
+
+        ax.plot(Pt_interpolated[0, :],
+                Pt_interpolated[1, :],
+                Pt_interpolated[2, :],
+                "xb",
+                label="initial guess"
+                )
+
+        ax.plot(
+            Pt_ancrage_interpolated[:, 0],
+            Pt_ancrage_interpolated[:, 1],
+            Pt_ancrage_interpolated[:, 2],
+            "ok",
+            mfc="none",
+            alpha=0.5,
+            markersize=3,
+            label="Model Frame",
+        )
+
+        ax.plot(
+            Pts_ancrage[idx, :, 0],
+            Pts_ancrage[idx, :, 1],
+            Pts_ancrage[idx, :, 2],
+            ".k",
+            markersize=3,
+            label="Experimental Frame",
+        )
+        ax.plot(
+            Pts_collecte[idx, 0, :],
+            Pts_collecte[idx, 1, :],
+            Pts_collecte[idx, 2, :],
+            ".b",
+            markersize=3,
+            label="Experimental Trampoline"
+        )
+        ax.plot(
+            Pts_collecte[idx, 0, ind_masse],
+            Pts_collecte[idx, 1, ind_masse],
+            Pts_collecte[idx, 2, ind_masse],
+            ".g",
+            markersize=3,
+            label="Lowest point on the interval",
+        )
+        ax.plot(
+            Pt[:, 0],
+            Pt[:, 1],
+            Pt[:, 2],
+            "ob",
+            mfc="none",
+            markersize=3,
+            label="Optimized point positions",
+        )
+
+        for ind in range(m*n):
+            plt.plot(np.vstack((Pt[ind, 0], Pt[ind, 0] + F_point[ind, 0] / 100000)),
+                     np.vstack((Pt[ind, 1], Pt[ind, 1] + F_point[ind, 1] / 100000)),
+                     np.vstack((Pt[ind, 2], Pt[ind, 2] + F_point[ind, 2] / 100000)),
+                     "-r")
+
+        ax.legend()
+        plt.savefig(f"results_multiple_static_optim_in_a_row/solution_frame{frame}_{ends_with}.png")
+        plt.show()
 
 
 if __name__ == "__main__":
+    n = 15
+    m = 9
     main()

@@ -255,62 +255,6 @@ def Param():
     return k, k_oblique, M, C
 
 
-# def Points_ancrage_fix(dict_fixed_params):
-#     dL = dict_fixed_params["dL"]
-#     dl = dict_fixed_params["dl"]
-#     l_droite = dict_fixed_params["l_droite"]
-#     l_gauche = dict_fixed_params["l_gauche"]
-#     L_haut = dict_fixed_params["L_haut"]
-#     L_bas = dict_fixed_params["L_bas"]
-#
-#     # repos :
-#     Pt_repos = np.zeros((n * m, 3))
-#
-#     # on dit que le point numero 0 est a l'origine
-#     for j in range(m):
-#         for i in range(n):
-#             # Pt_repos[i + j * n] = np.array([-np.sum(dl[:j + 1]), np.sum(dL[:i + 1]), 0])
-#             Pt_repos[i + j * n, :] = np.array([-np.sum(dl[: j + 1]), np.sum(dL[: i + 1]), 0])
-#
-#     Pt_repos_new = np.zeros((n * m, 3))
-#     for j in range(m):
-#         for i in range(n):
-#             Pt_repos_new[i + j * n, :] = Pt_repos[i + j * n, :] - Pt_repos[67, :]
-#
-#     # ancrage :
-#     Pt_ancrage = np.zeros((2 * (n + m), 3))
-#     # cote droit :
-#     for i in range(n):
-#         Pt_ancrage[i, 1:2] = Pt_repos_new[i, 1:2]
-#         Pt_ancrage[i, 0] = l_droite
-#     # cote haut : on fait un truc complique pour center autour de l'axe vertical
-#     Pt_ancrage[n + 4, :] = np.array([0, L_haut, 0])
-#     for j in range(n, n + 4):
-#         Pt_ancrage[j, :] = np.array([0, L_haut, 0]) + np.array([np.sum(dl[1 + j - n : 5]), 0, 0])
-#     for j in range(n + 5, n + m):
-#         Pt_ancrage[j, :] = np.array([0, L_haut, 0]) - np.array([np.sum(dl[5 : j - n + 1]), 0, 0])
-#     # cote gauche :
-#     for k in range(n + m, 2 * n + m):
-#         Pt_ancrage[k, 1:2] = -Pt_repos_new[k - n - m, 1:2]
-#         Pt_ancrage[k, 0] = -l_gauche
-#     # cote bas :
-#     Pt_ancrage[2 * n + m + 4, :] = np.array([0, -L_bas, 0])
-#
-#     Pt_ancrage[2 * n + m, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:9]), 0, 0])
-#     Pt_ancrage[2 * n + m + 1, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:8]), 0, 0])
-#     Pt_ancrage[2 * n + m + 2, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:7]), 0, 0])
-#     Pt_ancrage[2 * n + m + 3, :] = np.array([0, -L_bas, 0]) - np.array([np.sum(dl[5:6]), 0, 0])
-#
-#     Pt_ancrage[2 * n + m + 5, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[4:5]), 0, 0])
-#     Pt_ancrage[2 * n + m + 6, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[3:5]), 0, 0])
-#     Pt_ancrage[2 * n + m + 7, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[2:5]), 0, 0])
-#     Pt_ancrage[2 * n + m + 8, :] = np.array([0, -L_bas, 0]) + np.array([np.sum(dl[1:5]), 0, 0])
-#
-#     Pt_ancrage, Pt_repos_new = rotation_points2(Pt_ancrage, Pt_repos_new)
-#
-#     return Pt_ancrage, Pt_repos_new
-
-
 def Points_ancrage_repos(dict_fixed_params):
     dL = dict_fixed_params["dL"]
     dl = dict_fixed_params["dl"]
@@ -567,40 +511,6 @@ def rotation_points(Pt_ancrage, Pt_repos):
         Pt_repos_new[index, :] = np.matmul(Pt_repos[index, :], mat_base_inv_np)
 
     return Pt_ancrage_new, Pt_repos_new
-
-
-#
-# def rotation_points2(Pt_ancrage, Pt_repos):
-#     """
-#     Appliquer la rotation pour avoir la même orientation que les points de la collecte
-#     :param Pt_repos: cas.DM(n*m,3): coordonnées (2D) des points de la toile
-#     :param Pt_ancrage: cas.DM(2*n+2*m,3): coordonnées des points du cadre
-#     :return: Pt_repos, Pt_ancrage
-#     """
-#
-#     mat_base_collecte = np.array(
-#         [
-#             [0.99964304, -0.02650231, 0.00338079],
-#             [0.02650787, 0.99964731, -0.00160831],
-#             [-0.00333697, 0.00169736, 0.99999299],
-#         ]
-#     )
-#     # calcul inverse
-#     # mat_base_inv_np = np.linalg.inv(mat_base_collecte)
-#     mat_base_inv_np = mat_base_collecte
-#
-#     Pt_ancrage_new = np.zeros((Nb_ressorts_cadre, 3))
-#     for index in range(Nb_ressorts_cadre):
-#         Pt_ancrage_new[index, :] = np.matmul(
-#             Pt_ancrage[index, :], mat_base_inv_np
-#         )  # multplication de matrices en casadi
-#
-#     Pt_repos_new = np.zeros((n * m, 3))
-#     for index in range(n * m):
-#         Pt_repos_new[index, :] = np.matmul(Pt_repos[index, :], mat_base_inv_np)
-#
-#     return Pt_ancrage_new, Pt_repos_new
-
 
 def static_forces_calc(
     Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2, dict_fixed_params
@@ -990,39 +900,6 @@ def Resultat_PF_collecte(participant, static_trial_name, empty_trial_name, trial
         idx_min_dynamique = np.argmin(position_min)
         label_min_dynamique = labels_min[idx_min_dynamique]
 
-        # # on cherche le z min obtenu sur notre intervalle
-        # #compter le nombre de nan par marqueur au cours de l'intervalle :
-        # isnan_marqueur = np.zeros(len(labels))
-        # for i in range (len(labels)) :
-        #     # for time in range (jump_frame_index_interval[0], jump_frame_index_interval[1]) :
-        #     for time in range(jump_frame_index_interval[1] - jump_frame_index_interval[0]):
-        #         if np.isnan(points[2, i,time])==True :
-        #             isnan_marqueur[i] += 1
-        #
-        # # trier les marqueurs en t qui sont des nan sur tout l'intervalle
-        # labels_notnan = []
-        # for i in range (len(labels)):
-        #     #s'il y a autant de nan que de points dans l'intervalle, alors on n'en veut pas  = on enleve les marqueurs qui n'ont pas ete detecté
-        #     if isnan_marqueur[i] != jump_frame_index_interval[1] - jump_frame_index_interval[0] :
-        #         labels_notnan += [labels[i]]
-        #
-        # indice_notnan= []
-        # for i in range (len (labels_notnan)) :
-        #     indice_notnan += [labels.index(labels_notnan[i])]
-        #
-        # labels_modified=[labels[i] for i in indice_notnan]
-        # points_modified = points[:,indice_notnan,:] #ensemble des points de toutes les frames MAIS sans les NaN
-        #
-        # #on peut enfin calculer le minimum :
-        # # on cherche le z min de chaque marqueur (on en profite pour supprimer les nan)
-        # # minimum_marqueur = [np.nanmin(points_modified[2, i,jump_frame_index_interval[0] : jump_frame_index_interval[1]]) for i in range(len(indice_notnan))]
-        # minimum_marqueur = [np.nanmin(points_modified[2, i, :]) for i in range(len(indice_notnan))]
-        #
-        # #indice du marqueur ayant le plus petit z sur tout l'intervalle
-        # argmin_marqueur = np.argmin(minimum_marqueur)
-        # label_min = labels_modified[argmin_marqueur]
-        #
-        # return argmin_marqueur, label_min
         return idx_min_dynamique, label_min_dynamique
 
     if participant == 0:
@@ -1082,18 +959,6 @@ def Point_ancrage(Point_collecte, labels):
                 point_ancrage[frame, int(lab[1:]), :] = Point_collecte[frame][:, idx]
             if lab not in label_ancrage:
                 label_ancrage.append(lab)
-    #
-    # # transformation des elements en array
-    # liste_point_ancrage = []
-    # for list_point in point_ancrage:
-    #     tab_point = np.array((list_point[0]))
-    #     for ligne in range(1, len(list_point)):
-    #         tab_point = np.vstack((tab_point, list_point[ligne]))
-    #     liste_point_ancrage.append(tab_point)
-
-    # for point_anc in liste_point_ancrage:
-    #     point_anc = rotation_points(point_anc)
-
     return point_ancrage, label_ancrage
 
 
@@ -1112,10 +977,13 @@ def Point_toile_init(Point_collecte, labels):
                 label_toile.append(lab)
     return point_toile, label_toile
 
-def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, labels, with_plot=False):
+def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, dict_fixed_params, with_plot=False):
     """
     Interpolate to fill the missing markers.
     """
+
+    dL = dict_fixed_params["dL"]
+    dl = dict_fixed_params["dl"]
 
     Pt_interpolated = np.zeros((len(Pt_collecte), m * n, 3))
     Pt_interpolated[:, :, :] = np.nan
@@ -1161,6 +1029,97 @@ def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage
         missing_indices = np.where(Pt_needs_interpolation[frame, :, 0] == 1)[0]
         missing_ancrage_indices = np.where(Pt_ancrage_need_interpolation[frame, :, 0] == 1)[0]
 
+
+        # Split the points by column + interpolation  based on splines
+        Pt_column_interpolated = np.zeros((m * n, 3))
+        for i in range(m):
+            Pt_column_i = np.zeros((n + 2, 3))
+            Pt_column_repos_i = np.zeros((n + 2, 3))
+            Pt_column_i[:, :] = np.nan
+            Pt_column_repos_i[:, :] = np.nan
+            Pt_column_i[0, :] = Pt_ancrage_repos[2 * (n + m) - 1 - i, :]
+            Pt_column_repos_i[0, :] = Pt_ancrage_repos[2 * (n + m) - 1 - i, :]
+            Pt_column_i[1:n + 1, :] = Pt_interpolated[frame, n * i: n * (i + 1), :]
+            Pt_column_repos_i[1:n + 1, :] = Pt_repos[n * i: n * (i + 1), :]
+            Pt_column_i[-1, :] = Pt_ancrage_repos[n + i, :]
+            Pt_column_repos_i[-1, :] = Pt_ancrage_repos[n + i, :]
+            nan_idx = np.where(np.isnan(Pt_column_i[:, 0]))[0]
+            non_nan_idx = np.where(np.isnan(Pt_column_i[:, 0]) != True)[0]
+            if np.sum(nan_idx) > 0:
+                if len(Pt_column_i[non_nan_idx, 0]) <= 5:
+                    if len(Pt_column_i[non_nan_idx, 0]) < 1:
+                        degree = 1
+                    else:
+                        degree = len(Pt_column_i[non_nan_idx, 0]) - 1
+                else:
+                    degree = 5
+
+                t_non_normalized = []
+                for ii in range(1, n+1):
+                    t_non_normalized += [np.sum(dL[:ii])]
+                t_new = t_non_normalized / np.sum(dL)
+                t_new = t_new[nan_idx-1]
+
+                if t_new.shape != (0,):
+                    tck, u = scipy.interpolate.splprep([Pt_column_i[non_nan_idx, 0], Pt_column_i[non_nan_idx, 1], Pt_column_i[non_nan_idx, 2]], k=degree)
+                    new_points = scipy.interpolate.splev(t_new, tck)
+                    curves_to_plot = scipy.interpolate.splev(np.linspace(0, 1, 100), tck)
+                    ax.plot(curves_to_plot[0], curves_to_plot[1], curves_to_plot[2], "g")
+                    ax.plot(new_points[0], new_points[1], new_points[2], ".g")
+                    idx_added = 0
+                    for idx_to_add in range(n+2):
+                        if idx_to_add in nan_idx and idx_to_add != 0 and idx_to_add != n+1:
+                            Pt_column_interpolated[n * i + idx_to_add-1, 0] = new_points[0][idx_added]
+                            Pt_column_interpolated[n * i + idx_to_add-1, 1] = new_points[1][idx_added]
+                            Pt_column_interpolated[n * i + idx_to_add-1, 2] = new_points[2][idx_added]
+                            idx_added += 1
+
+        # Split the points by row + interpolation  based on splines
+        Pt_row_interpolated = np.zeros((m * n, 3))
+        for i in range(n):
+            Pt_row_i = np.zeros((m + 2, 3))
+            Pt_row_repos_i = np.zeros((m + 2, 3))
+            Pt_row_i[:, :] = np.nan
+            Pt_row_repos_i[:, :] = np.nan
+            Pt_row_i[0, :] = Pt_ancrage_repos[i, :]
+            Pt_row_repos_i[0, :] = Pt_ancrage_repos[i, :]
+            Pt_row_i[1:m + 1, :] = Pt_interpolated[frame, i::n, :]
+            Pt_row_repos_i[1:m + 1, :] = Pt_repos[i::n, :]
+            Pt_row_i[-1, :] = Pt_ancrage_repos[2*n + m - 1 - i, :]
+            Pt_row_repos_i[-1, :] = Pt_ancrage_repos[2*n + m - 1 - i, :]
+            nan_idx = np.where(np.isnan(Pt_row_i[:, 0]))[0]
+            non_nan_idx = np.where(np.isnan(Pt_row_i[:, 0]) != True)[0]
+            if np.sum(nan_idx) > 0:
+                if len(Pt_row_i[non_nan_idx, 0]) <= 5:
+                    if len(Pt_row_i[non_nan_idx, 0]) < 1:
+                        degree = 1
+                    else:
+                        degree = len(Pt_row_i[non_nan_idx, 0]) - 1
+                else:
+                    degree = 5
+
+                t_non_normalized = []
+                for ii in range(1, n+1):
+                    t_non_normalized += [np.sum(dl[:ii])]
+                t_new = t_non_normalized / np.sum(dl)
+                t_new = t_new[nan_idx-1]
+
+                if t_new.shape != (0,):
+                    tck, u = scipy.interpolate.splprep(
+                        [Pt_row_i[non_nan_idx, 0], Pt_row_i[non_nan_idx, 1], Pt_row_i[non_nan_idx, 2]],
+                        k=degree)
+                    new_points = scipy.interpolate.splev(t_new, tck)
+                    curves_to_plot = scipy.interpolate.splev(np.linspace(0, 1, 100), tck)
+                    ax.plot(curves_to_plot[0], curves_to_plot[1], curves_to_plot[2], "m")
+                    ax.plot(new_points[0], new_points[1], new_points[2], ".m")
+                    idx_added = 0
+                    for idx_to_add in range(m + 2):
+                        if idx_to_add in nan_idx and idx_to_add != 0 and idx_to_add != m + 1:
+                            Pt_row_interpolated[n * (idx_to_add - 1) + i, 0] = new_points[0][idx_added]
+                            Pt_row_interpolated[n * (idx_to_add - 1) + i, 1] = new_points[1][idx_added]
+                            Pt_row_interpolated[n * (idx_to_add - 1) + i, 2] = new_points[2][idx_added]
+                            idx_added += 1
+
         # Fit a polynomial surface to the points that we have
         degree = 10
         model = make_pipeline(PolynomialFeatures(degree), LinearRegression())
@@ -1176,6 +1135,8 @@ def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage
 
         # Approximate the position of the missing markers + plot
         Z_new = model.predict(Pt_repos[missing_indices, :2])
+        Z_new[np.where(Z_new > 0.01)] = 0.01
+
         if with_plot:
             ax.scatter(
                 Pt_repos[missing_indices, 0],
@@ -1203,11 +1164,11 @@ def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage
             ax.plot_surface(xx, yy, zz, alpha=0.5, color="k", label="Fitted Surface")
 
             ax.legend()
-            ax.view_init(0, 90)
+            # ax.view_init(0, 90)
             ax.set_zlim(-1, 1)
             if frame % 10 == 0:
                 plt.savefig("../Plots/interpolaion_frame_" + str(frame) + ".png")
-            # plt.show()
+            plt.show()
 
         Pt_interpolated[frame, missing_indices, :2] = Pt_repos[missing_indices, :2]
         Pt_interpolated[frame, missing_indices, 2] = Z_new[:, 0]
@@ -1541,6 +1502,49 @@ def Animation(Pt_integres, Pt_collecte_tab, jump_frame_index_interval):
     animate.save(output_file_name, fps=20)
     plt.show()
 
+def plot_results(Pt_ancrage_repos, Pt_repos, Pt_ancrage_collecte, Pt_toile_collecte, ind_masse):
+    """
+    Plot the position of the markers vs model points
+    """
+
+    fig = plt.figure(0)
+    ax = fig.add_subplot(111, projection="3d")
+    ax.set_box_aspect([1.1, 1.8, 1])
+    ax.plot(0, 0, -1.2, "ow")
+
+    ax.plot(
+        Pt_ancrage_repos[:, 0],
+        Pt_ancrage_repos[:, 1],
+        Pt_ancrage_repos[:, 2],
+        ".k",
+        mfc="none",
+        alpha=0.5,
+        label="Model Frame",
+    )
+    ax.plot(Pt_repos.T[0, :], Pt_repos.T[1, :], Pt_repos.T[2, :], ".b", mfc="none", alpha=0.5, label="Model Trampline")
+
+    ax.plot(
+        Pt_ancrage_collecte[:, 0],
+        Pt_ancrage_collecte[:, 1],
+        Pt_ancrage_collecte[:, 2],
+        "ok",
+        label="Experimental Frame",
+    )
+    ax.plot(
+        Pt_toile_collecte[0, :], Pt_toile_collecte[1, :], Pt_toile_collecte[2, :], ".b", label="Experimental Trampoline"
+    )
+    ax.plot(
+        Pt_toile_collecte[0, ind_masse],
+        Pt_toile_collecte[1, ind_masse],
+        Pt_toile_collecte[2, ind_masse],
+        ".g",
+        label="Lowest point on the interval",
+    )
+
+    ax.set_title("Data collection markers vs model points")
+    ax.legend()
+    plt.show()
+
 
 ###############################################################################
 ###############################################################################
@@ -1575,7 +1579,7 @@ def main():
     Pt_toile_collecte, label_toile = Point_toile_init(Pt_collecte_tab, labels)
 
     Pt_interpoles, Pt_ancrage_interpolated = surface_interpolation_collecte(
-        Pt_toile_collecte, Pt_ancrage_collecte, Pt_repos, Pt_ancrage_repos, labels
+        Pt_toile_collecte, Pt_ancrage_collecte, Pt_repos, Pt_ancrage_repos, dict_fixed_params, with_plot=True
     )
 
     # Pt_integres, erreur_relative, erreur_absolue, static_force_in_each_points, v_all = multiple_shooting_euler_integration(nb_frame, Pt_interpoles, labels, Masse_centre)
@@ -1583,44 +1587,7 @@ def main():
         nb_frame, Pt_interpoles, Pt_ancrage_interpolated, dict_fixed_params
     )
 
-    # Plot the position of the markers vs model points at the initial instant
-    fig = plt.figure(0)
-    ax = fig.add_subplot(111, projection="3d")
-    ax.set_box_aspect([1.1, 1.8, 1])
-    ax.plot(0, 0, -1.2, "ow")
-
-    ax.plot(
-        Pt_ancrage_repos[:, 0],
-        Pt_ancrage_repos[:, 1],
-        Pt_ancrage_repos[:, 2],
-        ".k",
-        mfc="none",
-        alpha=0.5,
-        label="Model Frame",
-    )
-    ax.plot(Pt_repos.T[0, :], Pt_repos.T[1, :], Pt_repos.T[2, :], ".b", mfc="none", alpha=0.5, label="Model Trampline")
-
-    ax.plot(
-        Pt_ancrage_collecte[:, 0],
-        Pt_ancrage_collecte[:, 1],
-        Pt_ancrage_collecte[:, 2],
-        ".k",
-        label="Experimental Frame",
-    )
-    ax.plot(
-        Pt_toile_collecte[0, :], Pt_toile_collecte[1, :], Pt_toile_collecte[2, :], ".b", label="Experimental Trampoline"
-    )
-    ax.plot(
-        Pt_toile_collecte[0, ind_masse],
-        Pt_toile_collecte[1, ind_masse],
-        Pt_toile_collecte[2, ind_masse],
-        ".g",
-        label="Lowest point on the interval",
-    )
-
-    ax.set_title("Data collection markers vs model points")
-    ax.legend()
-    plt.show()
+    plot_results(Pt_ancrage_repos, Pt_repos, Pt_ancrage_collecte, Pt_toile_collecte, ind_masse)
 
     # Animation of the markers vs integrated marker position
     Animation(Pt_integres, Pt_collecte_tab, jump_frame_index_interval)
