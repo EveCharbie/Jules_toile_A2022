@@ -381,7 +381,7 @@ def Points_ancrage_repos(dict_fixed_params):
     return Pt_ancrage_cas, Pos_repos_cas  # np
 
 
-def Spring_bouts(Pt, Pt_ancrage):  # sx
+def Spring_bouts(Pt, Pt_ancrage):
     """
 
     :param Pt: cas.MX(n*m,3): coordonnées des n*m points de la toile
@@ -390,9 +390,15 @@ def Spring_bouts(Pt, Pt_ancrage):  # sx
     :return: Spring_bout_1: cas.MX((Nb_ressorts, 3)): bout 1 de chaque ressort non oblique dont ressorts du cadre
     :return: Spring_bout_2: cas.MX((Nb_ressorts, 3)): bout 2 de chaque ressort non oblique dont ressorts du cadre
     """
+    if type(Pt) == cas.MX:
+        zero_fcn = cas.MX.zeros
+    elif type(Pt) == cas.DM:
+        zero_fcn = cas.DM.zeros
+    elif type(Pt) == np.ndarray:
+        zero_fcn = np.zeros
 
     # Definition des ressorts (position, taille)
-    Spring_bout_1 = cas.MX.zeros((Nb_ressorts, 3))
+    Spring_bout_1 = zero_fcn((Nb_ressorts, 3))
 
     # RESSORTS ENTRE LE CADRE ET LA TOILE
     for i in range(0, Nb_ressorts_cadre):
@@ -409,7 +415,7 @@ def Spring_bouts(Pt, Pt_ancrage):  # sx
             Spring_bout_1[Nb_ressorts_cadre + Nb_ressorts_horz + k, :] = Pt[i + n * j, :]
             k += 1
     ####################################################################################################################
-    Spring_bout_2 = cas.MX.zeros((Nb_ressorts, 3))
+    Spring_bout_2 = zero_fcn((Nb_ressorts, 3))
 
     # RESSORTS ENTRE LE CADRE ET LA TOILE
     for i in range(0, n):  # points droite du bord de la toile
@@ -454,8 +460,16 @@ def Spring_bouts_croix(Pt):  # sx
     :return: Spring_bout_croix_1: cas.MX((Nb_ressorts_croix, 3)): bout 1 de chaque ressort oblique
     :return: Spring_bout_croix_2: cas.MX((Nb_ressorts_croix, 3)): bout 2 de chaque ressort oblique
     """
+
+    if type(Pt) == cas.MX:
+        zero_fcn = cas.MX.zeros
+    elif type(Pt) == cas.DM:
+        zero_fcn = cas.DM.zeros
+    elif type(Pt) == np.ndarray:
+        zero_fcn = np.zeros
+
     # RESSORTS OBLIQUES : il n'y en a pas entre le cadre et la toile
-    Spring_bout_croix_1 = cas.MX.zeros((Nb_ressorts_croix, 3))
+    Spring_bout_croix_1 = zero_fcn((Nb_ressorts_croix, 3))
 
     # Pour spring_bout_1 on prend uniquement les points de droite des ressorts obliques
     k = 0
@@ -467,7 +481,7 @@ def Spring_bouts_croix(Pt):  # sx
             Spring_bout_croix_1[k, :] = Pt[i, :]
             k += 1
 
-    Spring_bout_croix_2 = cas.MX.zeros((Nb_ressorts_croix, 3))
+    Spring_bout_croix_2 = zero_fcn((Nb_ressorts_croix, 3))
     # Pour spring_bout_2 on prend uniquement les points de gauche des ressorts obliques
     # pour chaue carre on commence par le point en haut a gauche, puis en bas a gauche
     # cetait un peu complique mais ca marche, faut pas le changer
@@ -508,31 +522,29 @@ def Force_calc(
 
     F_spring = cas.MX.zeros((Nb_ressorts, 3))
     Vect_unit_dir_F = cas.MX.zeros((Nb_ressorts, 3))
-    for i in range(Nb_ressorts):
-        Vect_unit_dir_F[i, :] = (Spring_bout_2[i, :] - Spring_bout_1[i, :]) / cas.norm_fro(
-            Spring_bout_2[i, :] - Spring_bout_1[i, :]
-        )
-    # Vect_unit_dir_F = (Spring_bout_2 - Spring_bout_1) / cas.norm_fro(Spring_bout_2 - Spring_bout_1)
     for ispring in range(Nb_ressorts):
-        F_spring[ispring, :] = (
-            Vect_unit_dir_F[ispring, :]
-            * k[ispring]
-            * (cas.norm_fro(Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]) - l_repos[ispring])
+        Vect_unit_dir_F[ispring, :] = (Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]) / cas.norm_fro(
+            Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]
         )
+        elongation = cas.norm_fro(Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]) - l_repos[ispring]
+        # F_spring[ispring, :] = cas.if_else(elongation > 0,  # Condition
+        #     Vect_unit_dir_F[ispring, :] * k[ispring] * elongation,  # if
+        #     cas.MX.zeros(1, 3)  # else
+        # )
+        F_spring[ispring, :] = Vect_unit_dir_F[ispring, :] * k[ispring] * elongation
 
-    # F_spring_croix = np.zeros((Nb_ressorts_croix, 3))
     F_spring_croix = cas.MX.zeros((Nb_ressorts_croix, 3))
     Vect_unit_dir_F_croix = cas.MX.zeros((Nb_ressorts, 3))
-    for i in range(Nb_ressorts_croix):
-        Vect_unit_dir_F_croix[i, :] = (Spring_bout_croix_2[i, :] - Spring_bout_croix_1[i, :]) / cas.norm_fro(
-            Spring_bout_croix_2[i, :] - Spring_bout_croix_1[i, :]
-        )
     for ispring in range(Nb_ressorts_croix):
-        F_spring_croix[ispring, :] = (
-            Vect_unit_dir_F_croix[ispring, :]
-            * k_oblique[ispring]
-            * (cas.norm_fro(Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) - l_repos_croix[ispring])
+        Vect_unit_dir_F_croix[ispring, :] = (Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) / cas.norm_fro(
+            Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]
         )
+        elongation_croix = cas.norm_fro(Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) - l_repos_croix[ispring]
+        # F_spring_croix[ispring, :] = cas.if_else(elongation_croix > 0,  # Condition
+        #     Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix, # if
+        #     cas.MX.zeros(1, 3)  # else
+        # )
+        F_spring_croix[ispring, :] = Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix
 
     F_masses = cas.MX.zeros((n * m, 3))
     F_masses[:, 2] = -M * 9.81
@@ -1076,7 +1088,7 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
     return F_totale, F_point
 
 
-def a_minimiser(X, K, Ma, Pt_collecte, Pt_ancrage, Pt_interpolated, dict_fixed_params, labels, ind_masse, optimize_static_mass):
+def cost_function(X, K, Ma, Pt_collecte, Pt_ancrage, Pt_interpolated, dict_fixed_params, labels, ind_masse, optimize_static_mass):
     F_totale, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma)
     Pt = list2tab(X)
 
@@ -1297,7 +1309,7 @@ def Optimisation(
         ubg += [0]
 
         # en statique on ne fait pas de boucle sur le temps :
-        J = a_minimiser(
+        J = cost_function(
             X,
             K,
             Ma,

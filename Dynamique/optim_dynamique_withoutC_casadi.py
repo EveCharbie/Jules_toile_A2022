@@ -27,7 +27,7 @@ sys.path.append("../")
 from enums import InitialGuessType
 
 sys.path.append("../Statique/")
-from Optim_35_essais_kM_regul_koblique import Param_fixe, Calcul_Pt_F, list2tab
+from Optim_35_essais_kM_regul_koblique import Param_fixe, Calcul_Pt_F, list2tab, Spring_bouts, Spring_bouts_croix
 from modele_dynamique_nxm_DimensionsReelles import (
     Resultat_PF_collecte,
     Point_ancrage,
@@ -37,6 +37,7 @@ from modele_dynamique_nxm_DimensionsReelles import (
     spring_bouts_collecte,
     static_forces_calc,
     static_force_in_each_point,
+    multiple_shooting_integration,
 )
 from Optim_multi_essais_kM_regul_koblique import m_bounds
 from Verif_optim_position_k_fixe import Param_variable
@@ -77,8 +78,8 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
 
     for k in range(n * m):
         if np.isnan(Pt_collecte[0, k]):
-            lbw_Pt += [Pt_interpolated[:, k] - 0.3]
-            ubw_Pt += [Pt_interpolated[:, k] + 0.3]
+            lbw_Pt += [Pt_interpolated[:, k] - 0.1]
+            ubw_Pt += [Pt_interpolated[:, k] + 0.1]
             w0_Pt += [Pt_interpolated[:, k]]
         else:
             lbw_Pt += [Pt_collecte[:, k] - 0.03]
@@ -87,9 +88,15 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
 
     return w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated, Pt_ancrage_interpolated
 
-def a_minimiser(X, K, Ma, F_athl, Pt_collecte, Pt_ancrage, Pt_interpolated, dict_fixed_params, labels, ind_masse):
+def cost_function(X, K, Ma, F_athl, Pt_collecte, Pt_ancrage, Pt_interpolated, dict_fixed_params, labels, ind_masse):
 
     _, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma)
+    Pt = list2tab(X)
+    Spring_bout_1, Spring_bout_2 = Spring_bouts(Pt, Pt_ancrage)
+    Spring_bout_croix_1, Spring_bout_croix_2 = Spring_bouts_croix(Pt)
+    spring_elongation = cas.norm_fro(Spring_bout_2 - Spring_bout_1) - dict_fixed_params["l_repos"]
+    spring_elongation_croix = cas.norm_fro(Spring_bout_croix_2 - Spring_bout_croix_1) - dict_fixed_params["l_repos_croix"]
+
     F_point[ind_masse, :] += F_athl[0:3].T
     F_point[ind_masse+1, :] += F_athl[3:6].T
     F_point[ind_masse-1, :] += F_athl[6:9].T
@@ -115,9 +122,37 @@ def a_minimiser(X, K, Ma, F_athl, Pt_collecte, Pt_ancrage, Pt_interpolated, dict
             else:
                 Difference += (F_point[ind, i]) ** 2
 
+    for ind in range(spring_elongation.shape[0]):
+        Difference += 500 * spring_elongation[ind] ** 2
+    for ind in range(spring_elongation_croix.shape[0]):
+        Difference += 0.01 * spring_elongation_croix[ind] ** 2
+
     obj = cas.Function("f", [X, Ma, F_athl], [Difference]).expand()
 
     return obj
+
+def constraints(X, Ma, Pt_ancrage, dict_fixed_params, Masse_centre):
+    Pt = list2tab(X)
+    Spring_bout_1, Spring_bout_2 = Spring_bouts(Pt, Pt_ancrage)
+    Spring_bout_croix_1, Spring_bout_croix_2 = Spring_bouts_croix(Pt)
+    spring_elongation = cas.norm_fro(Spring_bout_2 - Spring_bout_1) - dict_fixed_params["l_repos"]
+    spring_elongation_croix = cas.norm_fro(Spring_bout_croix_2 - Spring_bout_croix_1) - dict_fixed_params["l_repos_croix"]
+
+    g = []
+    lbg = []
+    ubg = []
+
+    g += [Ma[0] + Ma[1] + Ma[2] + Ma[3] + Ma[4] - Masse_centre]
+    lbg += [0]
+    ubg += [0]
+
+    g += [spring_elongation] + [spring_elongation_croix]
+    lbg += [0] * (spring_elongation.shape[0] + spring_elongation_croix.shape[0])
+    ubg += [np.inf] * (spring_elongation.shape[0] + spring_elongation_croix.shape[0])
+
+    g = cas.vertcat(*g)
+
+    return g, lbg, ubg
 
 def Optimisation(
     F_totale_collecte,
@@ -140,14 +175,14 @@ def Optimisation(
     w0 = []
     lbw = []
     ubw = []
-    g = []
-    lbg = []
-    ubg = []
 
     # NLP VALUES
     Ma = cas.MX.sym("Ma", 5)
     X = cas.MX.sym("X", n * m * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...)
     F_athl = cas.MX.sym("F_athl", 5 * 3) # Force applied by the athlete on the 5 points they touch
+
+    # PARAM VARIABLE
+    K, _, _ = Param_variable(Ma, ind_masse)
 
     # Ma
     w0_m, lbw_m, ubw_m = m_bounds(Masse_centre)
@@ -171,13 +206,10 @@ def Optimisation(
     w += [F_athl]
 
     # fonction contrainte :
-    g += [Ma[0] + Ma[1] + Ma[2] + Ma[3] + Ma[4] - Masse_centre]
-    lbg += [0]
-    ubg += [0]
+    g, lbg, ubg = constraints(X, Ma, Pt_ancrage_interpolated, dict_fixed_params, Masse_centre)
 
     # en statique on ne fait pas de boucle sur le temps :
-    K, _, _ = Param_variable(Ma, ind_masse)
-    J = a_minimiser(
+    J = cost_function(
         X,
         K,
         Ma,
@@ -192,8 +224,8 @@ def Optimisation(
     obj = J(X, Ma, F_athl)
 
     # Create an NLP solver
-    prob = {"f": obj, "x": cas.vertcat(*w), "g": cas.vertcat(*g)}
-    opts = {"ipopt": {"max_iter": 10000, "linear_solver": "ma57"}}  #  "nlp_scaling_method": "none"
+    prob = {"f": obj, "x": cas.vertcat(*w), "g": g}
+    opts = {"ipopt": {"max_iter": 1000, "linear_solver": "ma57", "nlp_scaling_method": "none"}}
     solver = cas.nlpsol("solver", "ipopt", prob, opts)
 
     # Solve the NLP
@@ -218,7 +250,7 @@ def main():
     trial_name = "labeled_p1_sauthaut_01"
     empty_trial_name = "labeled_statique_centrefront_vide"
     jump_frame_index_interval = [
-        7100,
+        7101,
         7120,
         # 7170,
     ]  # This range repends on the trial. To find it, one should use the code plateforme_verification_toutesversions.py.
@@ -344,21 +376,77 @@ def main():
             label="Optimized point positions",
         )
 
-        # for ind in range(m*n):
-        #     plt.plot(np.vstack((Pt[ind, 0], Pt[ind, 0] + F_point[ind, 0] / 100000)),
-        #              np.vstack((Pt[ind, 1], Pt[ind, 1] + F_point[ind, 1] / 100000)),
-        #              np.vstack((Pt[ind, 2], Pt[ind, 2] + F_point[ind, 2] / 100000)),
-        #              "-r")
-        #
-        # for ind, index in enumerate([ind_masse, ind_masse-1, ind_masse+1, ind_masse-15, ind_masse+15]):
-        #     plt.plot(np.vstack((Pt[index, 0], Pt[index, 0] + F_athl[ind, 0] / 100000)),
-        #              np.vstack((Pt[index, 1], Pt[index, 1] + F_athl[ind, 1] / 100000)),
-        #              np.vstack((Pt[index, 2], Pt[index, 2] + F_athl[ind, 2] / 100000)),
-        #              "-m")
+        for ind in range(m*n):
+            plt.plot(np.vstack((Pt[ind, 0], Pt[ind, 0] + F_point[ind, 0] / 100000)),
+                     np.vstack((Pt[ind, 1], Pt[ind, 1] + F_point[ind, 1] / 100000)),
+                     np.vstack((Pt[ind, 2], Pt[ind, 2] + F_point[ind, 2] / 100000)),
+                     "-r")
+
+        for ind, index in enumerate([ind_masse, ind_masse-1, ind_masse+1, ind_masse-15, ind_masse+15]):
+            plt.plot(np.vstack((Pt[index, 0], Pt[index, 0] + F_athl[ind, 0] / 100000)),
+                     np.vstack((Pt[index, 1], Pt[index, 1] + F_athl[ind, 1] / 100000)),
+                     np.vstack((Pt[index, 2], Pt[index, 2] + F_athl[ind, 2] / 100000)),
+                     "-m")
 
         ax.legend()
         plt.savefig(f"results_multiple_static_optim_in_a_row/solution_frame{frame}_{ends_with}.png")
         plt.show()
+
+        l_repos = dict_fixed_params["l_repos"]
+        l_repos_croix = dict_fixed_params["l_repos_croix"]
+        Spring_bout_1, Spring_bout_2 = Spring_bouts(Pt, Pt_ancrage_interpolated)
+        Spring_bout_croix_1, Spring_bout_croix_2 = Spring_bouts_croix(Pt)
+        spring_elongation = np.linalg.norm(Spring_bout_2 - Spring_bout_1, axis=1) - l_repos
+        spring_croix_elongation = np.linalg.norm(Spring_bout_croix_2 - Spring_bout_croix_1, axis=1) - l_repos_croix
+        print(np.sort(spring_elongation))
+        print(np.sort(spring_croix_elongation))
+
+        Pt_integres, erreur_relative, erreur_absolue, static_force_in_each_points, v_all = multiple_shooting_integration(
+            1, Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params
+        )
+        print("erreur relative : ", erreur_relative)
+        print("erreur absolue : ", erreur_absolue)
+
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+        ax.set_box_aspect([1.1, 1.8, 1])
+        ax.plot(0, 0, -1.2, "ow")
+
+        ax.plot(
+            Pt_ancrage_interpolated[:, 0],
+            Pt_ancrage_interpolated[:, 1],
+            Pt_ancrage_interpolated[:, 2],
+            "ok",
+            mfc="none",
+            alpha=0.5,
+            markersize=3,
+            label="Model Frame",
+        )
+
+        ax.plot(
+            Pts_collecte[idx+1, 0, :],
+            Pts_collecte[idx+1, 1, :],
+            Pts_collecte[idx+1, 2, :],
+            ".b",
+            markersize=3,
+            label="Experimental Trampoline frame + 1"
+        )
+
+        ax.plot(
+            Pt_integres[:, 0],
+            Pt_integres[:, 1],
+            Pt_integres[:, 2],
+            "ob",
+            mfc="none",
+            markersize=3,
+            label="Integrated point positions",
+        )
+
+        ax.legend()
+        plt.savefig(f"results_multiple_static_optim_in_a_row/integration_frame{frame}_{ends_with}.png")
+        plt.show()
+
 
 
 if __name__ == "__main__":

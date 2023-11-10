@@ -14,7 +14,7 @@ from scipy.interpolate import interp1d
 import pickle
 import sys
 
-from Optim_35_essais_kM_regul_koblique import Calcul_Pt_F, Param_fixe, get_list_results_static, a_minimiser
+from Optim_35_essais_kM_regul_koblique import Calcul_Pt_F, Param_fixe, get_list_results_static, cost_function
 from Optim_multi_essais_kM_regul_koblique import Pt_bounds, m_bounds
 
 sys.path.append("../Dynamique/")
@@ -191,7 +191,7 @@ def Optimisation(
 
     # en statique on ne fait pas de boucle sur le temps :
     K, _, _ = Param_variable(Ma, ind_masse)
-    J = a_minimiser(
+    J = cost_function(
         X,
         K,
         Ma,

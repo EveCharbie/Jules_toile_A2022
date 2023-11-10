@@ -376,7 +376,7 @@ def Optimisation():  # main
 
         return lbw_F, ubw_F, w0_F
 
-    def A_minimiser(X, Xdot, C, F, Masse_centre, Pt_collecte, Force_collecte, force_accel_cadre, labels, ind_masse):
+    def cost_function(X, Xdot, C, F, Masse_centre, Pt_collecte, Force_collecte, force_accel_cadre, labels, ind_masse):
         """
         Fonction objectif, calculée puis évalueée a partir des variables symboliques
         on minimise :
@@ -528,7 +528,7 @@ def Optimisation():  # main
         ]  # force accel instant i, car par la meme taille que les autres array
 
         # -- on gere l'objectif a l'instant i
-        J = A_minimiser(
+        J = cost_function(
             X_sym,
             Xdot_sym,
             C_sym,

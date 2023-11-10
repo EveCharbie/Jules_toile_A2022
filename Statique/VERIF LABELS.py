@@ -1082,7 +1082,7 @@ def Calcul_Pt_F_verif(X, Pt_ancrage, dict_fixed_params, K, ind_masse):
     return F_totale, F_point
 
 
-def a_minimiser(X, K, F_totale_collecte, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, min_energie, ind_masse):
+def cost_function(X, K, F_totale_collecte, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, min_energie, ind_masse):
     F_totale, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse)
     Pt = list2tab(X)
     Pt_inter = interpolation_collecte(Pt_collecte, Pt_ancrage, labels)
@@ -1297,7 +1297,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
     w0 += w0_Pt
 
     # en statique on ne fait pas de boucle sur le temps :
-    J = a_minimiser(X, K, F_totale_collecte, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, min_energie, ind_masse)
+    J = cost_function(X, K, F_totale_collecte, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, min_energie, ind_masse)
     obj = J(X, K)
 
     # fonction contrainte :

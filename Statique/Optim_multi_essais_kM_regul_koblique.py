@@ -36,7 +36,7 @@ import sys
 sys.path.append("../")
 from enums import InitialGuessType
 
-from Optim_35_essais_kM_regul_koblique import interpolation_collecte, a_minimiser, Param_fixe
+from Optim_35_essais_kM_regul_koblique import interpolation_collecte, cost_function, Param_fixe
 
 sys.path.append("../Dynamique/")
 from modele_dynamique_nxm_DimensionsReelles import surface_interpolation_collecte, Points_ancrage_repos
@@ -199,7 +199,7 @@ def Optimisation(
         ubg += [0]
 
         # en statique on ne fait pas de boucle sur le temps :
-        J = a_minimiser(
+        J = cost_function(
             X,
             K,
             Ma,

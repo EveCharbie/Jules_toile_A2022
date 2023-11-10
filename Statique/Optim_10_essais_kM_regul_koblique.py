@@ -1094,7 +1094,7 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
     return F_totale, F_point
 
 
-def a_minimiser(
+def cost_function(
     X, K, Ma, F_totale_collecte, Pt_collecte, Pt_ancrage, dict_fixed_params, labels, min_energie, ind_masse
 ):
     F_totale, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma)
@@ -1330,7 +1330,7 @@ def Optimisation(participant, Masse_centre, trial_name, vide_name, frame, initia
         ubg += [0]
 
         # en statique on ne fait pas de boucle sur le temps :
-        J = a_minimiser(
+        J = cost_function(
             X,
             K,
             Ma,
