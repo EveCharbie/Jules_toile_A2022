@@ -982,6 +982,9 @@ def surface_interpolation_collecte(Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage
     Interpolate to fill the missing markers.
     """
 
+    n = 15
+    m = 9
+
     dL = dict_fixed_params["dL"]
     dl = dict_fixed_params["dl"]
 

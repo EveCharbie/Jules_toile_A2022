@@ -39,6 +39,13 @@ def Param_variable(Masse, ind_masse):
     The k values are the values obtained using the static optimization in Optim_35_essais_kM_regul_koblique.py.
     """
 
+    if type(Masse) == cas.MX:
+        zero_fcn = cas.MX.zeros
+    elif type(Masse) == cas.DM:
+        zero_fcn = cas.DM.zeros
+    elif type(Masse) == np.ndarray:
+        zero_fcn = np.zeros
+
     # RESULTS FROM THE STATIC OPTIMIZATION
     k1 = 1.21175669e05
     k2 = 3.20423906e03
@@ -54,8 +61,7 @@ def Param_variable(Masse, ind_masse):
     k_oblique_4 = 1.04226031e-04
 
     # ressorts entre le cadre du trampoline et la toile : k1,k2,k3,k4
-    # k_bord = np.zeros(Nb_ressorts_cadre)
-    k_bord = cas.DM.zeros(Nb_ressorts_cadre)
+    k_bord = zero_fcn((Nb_ressorts_cadre, 1))
     # cotes verticaux de la toile :
     k_bord[0:n], k_bord[n + m : 2 * n + m] = k2, k2
     # cotes horizontaux :
@@ -65,7 +71,7 @@ def Param_variable(Masse, ind_masse):
     k_bord[n], k_bord[n + m - 1], k_bord[2 * n + m], k_bord[2 * (n + m) - 1] = k3, k3, k3, k3
 
     # ressorts horizontaux dans la toile
-    k_horizontaux = k6 * cas.DM.ones(n * (m - 1))
+    k_horizontaux = k6 * zero_fcn((n * (m - 1), 1))
     k_horizontaux[0 : n * (m - 1) : n] = k5  # ressorts horizontaux du bord DE LA TOILE en bas
     k_horizontaux[n - 1 : n * (m - 1) : n] = k5  # ressorts horizontaux du bord DE LA TOILE en haut
 
@@ -81,7 +87,7 @@ def Param_variable(Masse, ind_masse):
 
     # RESSORTS OBLIQUES
     # milieux :
-    k_oblique = cas.DM.zeros(Nb_ressorts_croix)
+    k_oblique = zero_fcn((Nb_ressorts_croix, 1))
 
     # coins :
     k_oblique[0], k_oblique[1] = k_oblique_1, k_oblique_1  # en bas a droite
@@ -118,6 +124,7 @@ def Param_variable(Masse, ind_masse):
     mcoin = (
         0.25 * (Mtrampo / ((n - 1) * (m - 1))) + mressort_coin + 4 * ((mressort_bord / 2) + mattache)
     )  # masse d un point situé dans un coin
+
 
     M = mmilieu * cas.MX.ones(n * m)  # on initialise toutes les masses a celle du centre
     M[0], M[n - 1], M[n * (m - 1)], M[n * m - 1] = mcoin, mcoin, mcoin, mcoin

@@ -1,20 +1,8 @@
 """
-Optimization of the position and velocity of the trampoline bed model points.
-The elasticity coefficients are taken from the static optimization (K are constants).
-No damping coefficients are used.
-The goal is to minimize the distance between the model points and the markers and the difference between the force
 
-Optimization variables:
-    - C
-    - X
-    - Xdot
-    - Force athlete «-» toile
-
-The distance between the model points and markers and the difference between the force and the model force plates are
-minimized.
 """
 
-import casadi as cas
+import pygmo as pg
 from IPython import embed
 import numpy as np
 import matplotlib.pyplot as plt
@@ -41,65 +29,17 @@ from modele_dynamique_nxm_DimensionsReelles import (
 )
 from Optim_multi_essais_kM_regul_koblique import m_bounds
 from Verif_optim_position_k_fixe import Param_variable
+from optim_dynamique_withoutC_casadi import get_list_results_dynamic, Pt_bounds, F_bounds
 
-def get_list_results_dynamic(participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval):
-    F_totale_collecte, Pt_collecte_tab, labels, ind_masse = Resultat_PF_collecte(
-        participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval
-    )
-    Pt_ancrage, labels_ancrage = Point_ancrage(Pt_collecte_tab, labels)
-    Pt_collecte, label_toile = Point_toile_init(Pt_collecte_tab, labels)
+def cost_function(X, Ma, F_athl, Pt_collecte, Pt_ancrage_interpolated, dict_fixed_params, labels, ind_masse):
 
-    return F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage
-
-
-def F_bounds():
-    w0_F = np.zeros((5*3))
-    lbw_F = np.ones((5*3)) * -10000
-    ubw_F = np.ones((5*3)) * 10000
-    return w0_F, lbw_F, ubw_F
-
-def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, dict_fixed_params):
-    """
-    Returns the bounds on the position of the points of the model based on the interpolation of the missing points.
-    """
-
-    n = 15
-    m = 9
-
-    if initial_guess == InitialGuessType.SURFACE_INTERPOLATION:
-        Pt_interpolated, Pt_ancrage_interpolated = surface_interpolation_collecte(
-            [Pt_collecte], [Pt_ancrage], Pt_repos, Pt_ancrage_repos, dict_fixed_params, False
-        )
-        Pt_interpolated = Pt_interpolated[0,:,:].T
-        Pt_ancrage_interpolated = Pt_ancrage_interpolated[0, :, :]
-    else:
-        raise RuntimeError(f"The interpolation type of the initial guess {initial_guess} is not accepted for this problem.")
-
-    # bounds and initial guess
-    lbw_Pt = []
-    ubw_Pt = []
-    w0_Pt = []
-
-    for k in range(n * m):
-        if np.isnan(Pt_collecte[0, k]):
-            lbw_Pt += [Pt_interpolated[:, k] - 0.1]
-            ubw_Pt += [Pt_interpolated[:, k] + 0.1]
-            w0_Pt += [Pt_interpolated[:, k]]
-        else:
-            lbw_Pt += [Pt_collecte[:, k] - 0.03]
-            ubw_Pt += [Pt_collecte[:, k] + 0.03]
-            w0_Pt += [Pt_collecte[:, k]]
-
-    return w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated, Pt_ancrage_interpolated
-
-def cost_function(X, K, Ma, F_athl, Pt_collecte, Pt_ancrage, Pt_interpolated, dict_fixed_params, labels, ind_masse):
-
-    _, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma)
+    K, _, _ = Param_variable(Ma, ind_masse)
+    _, F_point = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma)
     Pt = list2tab(X)
-    Spring_bout_1, Spring_bout_2 = Spring_bouts(Pt, Pt_ancrage)
+    Spring_bout_1, Spring_bout_2 = Spring_bouts(Pt, Pt_ancrage_interpolated)
     Spring_bout_croix_1, Spring_bout_croix_2 = Spring_bouts_croix(Pt)
-    spring_elongation = cas.norm_fro(Spring_bout_2 - Spring_bout_1) - dict_fixed_params["l_repos"]
-    spring_elongation_croix = cas.norm_fro(Spring_bout_croix_2 - Spring_bout_croix_1) - dict_fixed_params["l_repos_croix"]
+    spring_elongation = np.linalg.norm(Spring_bout_2 - Spring_bout_1) - dict_fixed_params["l_repos"]
+    spring_elongation_croix = np.linalg.norm(Spring_bout_croix_2 - Spring_bout_croix_1) - dict_fixed_params["l_repos_croix"]
 
     F_point[ind_masse, :] += F_athl[0:3].T
     F_point[ind_masse+1, :] += F_athl[3:6].T
@@ -109,7 +49,7 @@ def cost_function(X, K, Ma, F_athl, Pt_collecte, Pt_ancrage, Pt_interpolated, di
 
     Pt = list2tab(X)
 
-    Difference = cas.MX.zeros(1)
+    Difference = 0
     for i in range(3):
         for ind in range(n * m):
 
@@ -131,122 +71,128 @@ def cost_function(X, K, Ma, F_athl, Pt_collecte, Pt_ancrage, Pt_interpolated, di
     for ind in range(spring_elongation_croix.shape[0]):
         Difference += 0.01 * spring_elongation_croix[ind] ** 2
 
-    obj = cas.Function("f", [X, Ma, F_athl], [Difference]).expand()
+    return Difference
 
-    return obj
+def equality_constraints_function(Ma, Masse_centre):
+    g = [Ma[0] + Ma[1] + Ma[2] + Ma[3] + Ma[4] - Masse_centre]
+    return g
 
-def constraints(X, Ma, Pt_ancrage, dict_fixed_params, Masse_centre):
+def inequality_constraints_function(X, Pt_ancrage_interpolated, dict_fixed_params):
     Pt = list2tab(X)
-    Spring_bout_1, Spring_bout_2 = Spring_bouts(Pt, Pt_ancrage)
+    Spring_bout_1, Spring_bout_2 = Spring_bouts(Pt, Pt_ancrage_interpolated)
     Spring_bout_croix_1, Spring_bout_croix_2 = Spring_bouts_croix(Pt)
-    spring_elongation = cas.norm_fro(Spring_bout_2 - Spring_bout_1) - dict_fixed_params["l_repos"]
-    spring_elongation_croix = cas.norm_fro(Spring_bout_croix_2 - Spring_bout_croix_1) - dict_fixed_params["l_repos_croix"]
+    spring_elongation = - np.linalg.norm(Spring_bout_2 - Spring_bout_1) - dict_fixed_params["l_repos"]
+    spring_elongation_croix = - np.linalg.norm(Spring_bout_croix_2 - Spring_bout_croix_1) - dict_fixed_params["l_repos_croix"]
+    g = [spring_elongation] + [spring_elongation_croix]
+    return g
 
-    g = []
-    lbg = []
-    ubg = []
+class global_optimisation:
+    """
+    This class does a few steps of the global optimization (genetic algorithm) using pygmo.
+        - fitness: The function returning the fitness of the solution
+        - get_nobj: The function returning the number of objectives
+        - get_bounds: The function returning the bounds on the weightings
+    """
 
-    g += [Ma[0] + Ma[1] + Ma[2] + Ma[3] + Ma[4] - Masse_centre]
-    lbg += [0]
-    ubg += [0]
+    def __init__(self, Pt_collecte, Pt_ancrage_interpolated, dict_fixed_params, labels, ind_masse, Masse_centre, Pt_repos, Pt_ancrage_repos):
+        self.Pt_collecte = Pt_collecte
+        self.Pt_ancrage_interpolated = Pt_ancrage_interpolated
+        self.dict_fixed_params = dict_fixed_params
+        self.labels = labels
+        self.ind_masse = ind_masse
+        self.Masse_centre = Masse_centre
+        self.Pt_repos = Pt_repos
+        self.Pt_ancrage_repos = Pt_ancrage_repos
 
-    g += [spring_elongation] + [spring_elongation_croix]
-    lbg += [0] * (spring_elongation.shape[0] + spring_elongation_croix.shape[0])
-    ubg += [np.inf] * (spring_elongation.shape[0] + spring_elongation_croix.shape[0])
+    def fitness(self, x):
+        """
+        This function returns how well did the weightings allow to fit the data to track.
+        The OCP is solved in this function.
+        """
+        global i_inverse
+        i_inverse += 1
+        print(
+            f"+++++++++++++++++++++++++++ {i_inverse}th evaluation of the cost function +++++++++++++++++++++++++++"
+        )
+        Ma = x[0:5]
+        X = x[5:n*m*3+5]
+        F_athl = x[-15:]
 
-    g = cas.vertcat(*g)
+        obj = cost_function(X, Ma, F_athl, self.Pt_collecte, self.Pt_ancrage_interpolated, self.dict_fixed_params, self.labels, self.ind_masse)
 
-    return g, lbg, ubg
+        equality_const = equality_constraints_function(Ma, self.Masse_centre)
 
-def Optimisation(
-    F_totale_collecte,
-    Pt_collecte,
-    labels,
-    ind_masse,
-    Pt_ancrage,
-    Masse_centre,
-    trial_name,
-    initial_guess,
-    optimize_static_mass,
-    dict_fixed_params,
-):
-    # PARAM FIXES
-    Pt_ancrage_repos, Pt_repos = Points_ancrage_repos(dict_fixed_params)
+        inequality_const = inequality_constraints_function(X, self.Pt_ancrage_interpolated, self.dict_fixed_params)
 
-    # OPTIMISATION :
-    # Start with an empty NLP
-    w = []
-    w0 = []
-    lbw = []
-    ubw = []
+        return [obj, equality_const, inequality_const]
 
-    # NLP VALUES
-    Ma = cas.MX.sym("Ma", 5)
-    X = cas.MX.sym("X", n * m * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...)
-    F_athl = cas.MX.sym("F_athl", 5 * 3) # Force applied by the athlete on the 5 points they touch
+    def get_nobj(self):
+        """
+        Number of objectives
+        """
+        return 1
 
-    # PARAM VARIABLE
-    K, _, _ = Param_variable(Ma, ind_masse)
+    def get_nic(self):
+        """
+        Number of inequality constraints
+        """
+        return 2
 
-    # Ma
-    w0_m, lbw_m, ubw_m = m_bounds(Masse_centre)
-    w0 += w0_m
-    lbw += lbw_m
-    ubw += ubw_m
-    w += [Ma]
+    def get_nec(self):
+        """
+        Number of equality constraints
+        """
+        return 1
 
-    # X
-    w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated, Pt_ancrage_interpolated = Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, dict_fixed_params)
-    lbw += lbw_Pt
-    ubw += ubw_Pt
-    w0 += w0_Pt
-    w += [X]
+    def get_bounds(self):
 
-    # Ma
-    w0_F, lbw_F, ubw_F = F_bounds()
-    w0 += list(w0_F)
-    lbw += list(lbw_F)
-    ubw += list(ubw_F)
-    w += [F_athl]
+        _, lbw_m, ubw_m = m_bounds(self.Masse_centre)
 
-    # fonction contrainte :
-    g, lbg, ubg = constraints(X, Ma, Pt_ancrage_interpolated, dict_fixed_params, Masse_centre)
+        initial_guess = InitialGuessType.SURFACE_INTERPOLATION
+        _, lbw_Pt, ubw_Pt, _, _ = Pt_bounds(initial_guess, self.Pt_collecte,
+                                        self.Pt_ancrage_interpolated, self.Pt_repos,
+                                        self.Pt_ancrage_repos, self.dict_fixed_params)
+        lbw_Pt = [lbw_Pt[i][j] for i in range(n*m) for j in range(3)]
+        ubw_Pt = [ubw_Pt[i][j] for i in range(n*m) for j in range(3)]
 
-    # en statique on ne fait pas de boucle sur le temps :
-    J = cost_function(
-        X,
-        K,
-        Ma,
-        F_athl,
-        Pt_collecte,
-        Pt_ancrage_interpolated,
-        Pt_interpolated,
-        dict_fixed_params,
-        labels,
-        ind_masse,
-    )
-    obj = J(X, Ma, F_athl)
+        _, lbw_F, ubw_F = F_bounds()
+        lbw_F = list(lbw_F)
+        ubw_F = list(ubw_F)
 
-    # Create an NLP solver
-    prob = {"f": obj, "x": cas.vertcat(*w), "g": g}
-    opts = {"ipopt": {"max_iter": 1000, "linear_solver": "ma57", "nlp_scaling_method": "none"}}
-    solver = cas.nlpsol("solver", "ipopt", prob, opts)
+        lbx = lbw_m + lbw_Pt + lbw_F
+        ubx = ubw_m + ubw_Pt + ubw_F
 
-    # Solve the NLP
-    sol = solver(
-        x0=cas.vertcat(*w0), lbx=cas.vertcat(*lbw), ubx=cas.vertcat(*ubw), lbg=cas.vertcat(*lbg), ubg=cas.vertcat(*ubg)
-    )
-    w_opt = sol["x"].full().flatten()
-    status = solver.stats()["return_status"]
+        return (lbx, ubx)
 
-    return w_opt, Pt_interpolated, F_totale_collecte, ind_masse, labels, Pt_ancrage_interpolated, dict_fixed_params, sol.get("f"), status
+    def gradient(self, x):
+        grad = pg.estimate_gradient_h(lambda x: self.fitness(x), x)
+        return grad
+
+def solve(prob):
+
+    global i_inverse
+    i_inverse = 0
+
+    algo = pg.algorithm(pg.simulated_annealing())
+    pop = pg.population(prob, size=100)
+
+    epsilon = 1e-8
+    diff = 10000
+    w_opt = None
+    while i_inverse < 100 and diff > epsilon:
+        olf_pop_f = np.min(pop.get_f())
+        pop = algo.evolve(pop)
+        new_pop_f = np.min(pop.get_f())
+        diff = olf_pop_f - new_pop_f
+        w_opt = pop.get_x()[np.argmin(pop.get_f())]
+
+    return w_opt, new_pop_f
 
 
 ##########################################################################################################################
 def main():
 
-    n = 15
-    m = 9
+    global i_inverse
 
     # SELECTION OF THE RESULTS FROM THE DATA COLLECTION
     participant = 1
@@ -263,9 +209,6 @@ def main():
     ]  # This range repends on the trial. To find it, one should use the code plateforme_verification_toutesversions.py.
     dt = 1 / 500  # Hz
 
-    initial_guess = InitialGuessType.SURFACE_INTERPOLATION
-    optimize_static_mass = False
-
     dict_fixed_params = Param_fixe()
     Fs_totale_collecte, Pts_collecte, labels, ind_masse, Pts_ancrage = get_list_results_dynamic(
         participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval
@@ -274,31 +217,35 @@ def main():
     ########################################################################################################################
 
     for idx, frame in enumerate(list(range(jump_frame_index_interval[0], jump_frame_index_interval[1]))):
-        w_opt, Pt_interpolated, F_totale_collecte, ind_masse, labels, Pt_ancrage_interpolated, dict_fixed_params, cost, status = Optimisation(
-            Fs_totale_collecte[idx, :],
+
+        Pt_ancrage_repos, Pt_repos = Points_ancrage_repos(dict_fixed_params)
+        initial_guess = InitialGuessType.SURFACE_INTERPOLATION
+        _, _, _, Pt_interpolated, Pt_ancrage_interpolated = Pt_bounds(initial_guess,
+                                                                      Pts_collecte[idx, :, :],
+                                                                      Pts_ancrage[idx, :, :],
+                                                                      Pt_repos,
+                                                                      Pt_ancrage_repos,
+                                                                      dict_fixed_params)
+
+        prob = pg.problem(global_optimisation(
             Pts_collecte[idx, :, :],
+            Pt_ancrage_interpolated,
+            dict_fixed_params,
             labels,
             ind_masse,
-            Pts_ancrage[idx, :, :],
             weight,
-            trial_name,
-            initial_guess,
-            optimize_static_mass,
-            dict_fixed_params,
-        )
+            Pt_repos,
+            Pt_ancrage_repos,
+        ))
+        w_opt, cost = solve(prob)
 
         Ma = np.array(w_opt[0:5])
         Pt = np.reshape(w_opt[5:-15], (n * m, 3))
         F_athl = np.reshape(w_opt[-15:], (5, 3))
         print(F_athl)
+        print(i_inverse)
 
-        # ENREGISTREMENT PICKLE#
-        if status == "Solve_Succeeded":
-            ends_with = "CVG"
-        else:
-            ends_with = "DVG"
-        path = f"results_multiple_static_optim_in_a_row/frame{frame}_{ends_with}.pkl"
-
+        path = f"results_multiple_static_optim_in_a_row/frame{frame}_SA.pkl"
         with open(path, "wb") as file:
             data = {"w_opt": w_opt,
                     "Ma": Ma,

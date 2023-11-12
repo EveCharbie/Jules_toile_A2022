@@ -1068,6 +1068,14 @@ def tab2list(tab):
 
 
 def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
+
+    if type(X) == cas.MX:
+        zero_fcn = cas.MX.zeros
+    elif type(X) == cas.DM:
+        zero_fcn = cas.DM.zeros
+    elif type(X) == np.ndarray:
+        zero_fcn = np.zeros
+
     k, k_croix = Param_variable(K)
     M = Param_variable_masse(ind_masse, Ma)
     Pt = list2tab(X)
@@ -1079,8 +1087,7 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
     )
     F_point = Force_point(F_spring, F_spring_croix, F_masses)
 
-    index_of_the_point_subject_to_masses = [ind_masse, ind_masse + 1, ind_masse - 1, ind_masse + 15, ind_masse - 15]
-    F_totale = cas.MX.zeros(3)
+    F_totale = zero_fcn((3, ))
     for ind in range(F_point.shape[0]):
         for i in range(3):
             F_totale[i] += F_point[ind, i]
