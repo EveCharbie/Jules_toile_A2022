@@ -13,6 +13,7 @@ class InitialGuessType(Enum):
     LINEAR_INTERPOLATION = "linear_interpolation"
     SURFACE_INTERPOLATION = "surface_interpolation"
     RESTING_POSITION = "resting_position"
+    GACO = "pygmo_gaco"
     NONE = None
 
 

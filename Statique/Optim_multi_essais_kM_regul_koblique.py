@@ -78,18 +78,24 @@ def k_bounds():
     return w0_k, lbw_k, ubw_k
 
 
-def m_bounds(masse_essai):
-    lbw_m, ubw_m = [], []
+def m_bounds(masse_essai, initial_guess, trial_name):
 
-    M1 = masse_essai / 5  # masse centre
-    M2 = masse_essai / 5  # masse centre +1
-    M3 = masse_essai / 5  # masse centre -1
-    M4 = masse_essai / 5  # masse centre +15
-    M5 = masse_essai / 5  # masse centre -15
-
-    w0_m = [M1, M2, M3, M4, M5]
-    lbw_m += [0.6 * masse_essai / 5] * 5  # diff here
-    ubw_m += [1.4 * masse_essai / 5] * 5  # diff here
+    if initial_guess == InitialGuessType.GACO:
+        with open(f"{trial_name}_gaco.pkl", "rb") as file:
+            data = pickle.load(file)
+            Ma = data["Ma"]
+            w0_m = list(Ma)
+            lbw_m = list(Ma * 0.5)
+            ubw_m = list(Ma * 1.5)
+    else:
+        M1 = masse_essai / 5  # masse centre
+        M2 = masse_essai / 5  # masse centre +1
+        M3 = masse_essai / 5  # masse centre -1
+        M4 = masse_essai / 5  # masse centre +15
+        M5 = masse_essai / 5  # masse centre -15
+        w0_m = [M1, M2, M3, M4, M5]
+        lbw_m = [0.6 * masse_essai / 5] * 5
+        ubw_m = [1.4 * masse_essai / 5] * 5
 
     return w0_m, lbw_m, ubw_m
 
@@ -178,7 +184,7 @@ def Optimisation(
         X = cas.MX.sym("X", n * m * 3)  # xyz pour chaque point (xyz_0, xyz_1, ...) puis Fxyz
 
         # Ma
-        w0_m, lbw_m, ubw_m = m_bounds(masse_essai)
+        w0_m, lbw_m, ubw_m = m_bounds(masse_essai, initial_guess, trial_name[i])
         w0 += w0_m
         lbw += lbw_m
         ubw += ubw_m

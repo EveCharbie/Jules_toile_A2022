@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import pickle
-
+import os
 import sys
 
 sys.path.append("../")
@@ -141,16 +141,20 @@ class global_optimisation:
 
     def get_bounds(self):
 
-        _, lbw_m, ubw_m = m_bounds(self.Masse_centre)
+        _, lbw_m, ubw_m = m_bounds(self.Masse_centre, None, None)
 
         initial_guess = InitialGuessType.SURFACE_INTERPOLATION
-        _, lbw_Pt, ubw_Pt, _, _ = Pt_bounds(initial_guess, self.Pt_collecte,
-                                        self.Pt_ancrage_interpolated, self.Pt_repos,
-                                        self.Pt_ancrage_repos, self.dict_fixed_params)
+        _, lbw_Pt, ubw_Pt, _, _ = Pt_bounds(initial_guess,
+                                            self.Pt_collecte,
+                                            self.Pt_ancrage_interpolated,
+                                            self.Pt_repos,
+                                            self.Pt_ancrage_repos,
+                                            self.dict_fixed_params,
+                                            None)
         lbw_Pt = [lbw_Pt[i][j] for i in range(n*m) for j in range(3)]
         ubw_Pt = [ubw_Pt[i][j] for i in range(n*m) for j in range(3)]
 
-        _, lbw_F, ubw_F = F_bounds()
+        _, lbw_F, ubw_F = F_bounds(None, None)
         lbw_F = list(lbw_F)
         ubw_F = list(ubw_F)
 
@@ -168,7 +172,7 @@ def solve(prob):
     bfe = True
     seed = 42
     pop_size = 500
-    num_gen = 150
+    num_gen = 5000
 
     algo = pg.gaco()
     if bfe:
@@ -212,6 +216,11 @@ def main():
     ]  # This range repends on the trial. To find it, one should use the code plateforme_verification_toutesversions.py.
     dt = 1 / 500  # Hz
 
+    # if trial_name is not a folder, create it
+    if not os.path.isdir(f"results_multiple_static_optim_in_a_row/{trial_name}"):
+        os.mkdir(f"results_multiple_static_optim_in_a_row/{trial_name}")
+
+
     dict_fixed_params = Param_fixe()
     Fs_totale_collecte, Pts_collecte, labels, ind_masse, Pts_ancrage = get_list_results_dynamic(
         participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval
@@ -228,7 +237,8 @@ def main():
                                                                       Pts_ancrage[idx, :, :],
                                                                       Pt_repos,
                                                                       Pt_ancrage_repos,
-                                                                      dict_fixed_params)
+                                                                      dict_fixed_params,
+                                                                      trial_name)
 
         prob = pg.problem(global_optimisation(
             Pts_collecte[idx, :, :],
@@ -247,7 +257,7 @@ def main():
         F_athl = np.reshape(w_opt[-15:], (5, 3))
         print(F_athl)
 
-        path = f"results_multiple_static_optim_in_a_row/frame{frame}_SA.pkl"
+        path = f"results_multiple_static_optim_in_a_row/{trial_name}/frame{frame}_gaco.pkl"
         with open(path, "wb") as file:
             data = {"w_opt": w_opt,
                     "Ma": Ma,
@@ -345,7 +355,7 @@ def main():
                      "-m")
 
         ax.legend()
-        plt.savefig(f"results_multiple_static_optim_in_a_row/solution_frame{frame}_{ends_with}.png")
+        plt.savefig(f"results_multiple_static_optim_in_a_row/{trial_name}/solution_frame{frame}_gaco.png")
         plt.show()
 
     l_repos = dict_fixed_params["l_repos"]
@@ -400,7 +410,7 @@ def main():
     )
 
     ax.legend()
-    plt.savefig(f"results_multiple_static_optim_in_a_row/integration_frame{frame}_{ends_with}.png")
+    plt.savefig(f"results_multiple_static_optim_in_a_row/{trial_name}/integration_frame{frame}_gaco.png")
     plt.show()
 
 

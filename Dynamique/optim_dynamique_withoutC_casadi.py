@@ -13,6 +13,7 @@ Optimization variables:
 The distance between the model points and markers and the difference between the force and the model force plates are
 minimized.
 """
+import os
 
 import casadi as cas
 from IPython import embed
@@ -52,13 +53,19 @@ def get_list_results_dynamic(participant, static_trial_name, empty_trial_name, t
     return F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage
 
 
-def F_bounds():
-    w0_F = np.zeros((5*3))
+def F_bounds(initial_guess, trial_name):
+    if initial_guess == InitialGuessType.GACO:
+        with open(f"{trial_name}_gaco.pkl", "rb") as file:
+            data = pickle.load(file)
+            F_athl = data["F_athl"]
+            w0_F = F_athl.flatten()
+    else:
+        w0_F = np.zeros((5*3))
     lbw_F = np.ones((5*3)) * -10000
     ubw_F = np.ones((5*3)) * 10000
     return w0_F, lbw_F, ubw_F
 
-def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, dict_fixed_params):
+def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, dict_fixed_params, trial_name):
     """
     Returns the bounds on the position of the points of the model based on the interpolation of the missing points.
     """
@@ -72,6 +79,11 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
         )
         Pt_interpolated = Pt_interpolated[0,:,:].T
         Pt_ancrage_interpolated = Pt_ancrage_interpolated[0, :, :]
+    elif initial_guess == InitialGuessType.GACO:
+        with open(f"{trial_name}_gaco.pkl", "rb") as file:
+            data = pickle.load(file)
+            Pt_interpolated = data["Pt"].T
+            Pt_ancrage_interpolated = data["Pt_ancrage_interpolated"]
     else:
         raise RuntimeError(f"The interpolation type of the initial guess {initial_guess} is not accepted for this problem.")
 
@@ -86,8 +98,8 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
             ubw_Pt += [Pt_interpolated[:, k] + 0.1]
             w0_Pt += [Pt_interpolated[:, k]]
         else:
-            lbw_Pt += [Pt_collecte[:, k] - 0.03]
-            ubw_Pt += [Pt_collecte[:, k] + 0.03]
+            lbw_Pt += [Pt_collecte[:, k] - 0.05]
+            ubw_Pt += [Pt_collecte[:, k] + 0.05]
             w0_Pt += [Pt_collecte[:, k]]
 
     return w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated, Pt_ancrage_interpolated
@@ -165,10 +177,9 @@ def Optimisation(
     ind_masse,
     Pt_ancrage,
     Masse_centre,
-    trial_name,
     initial_guess,
-    optimize_static_mass,
     dict_fixed_params,
+    trial_name,
 ):
     # PARAM FIXES
     Pt_ancrage_repos, Pt_repos = Points_ancrage_repos(dict_fixed_params)
@@ -189,21 +200,21 @@ def Optimisation(
     K, _, _ = Param_variable(Ma, ind_masse)
 
     # Ma
-    w0_m, lbw_m, ubw_m = m_bounds(Masse_centre)
+    w0_m, lbw_m, ubw_m = m_bounds(Masse_centre, initial_guess, trial_name)
     w0 += w0_m
     lbw += lbw_m
     ubw += ubw_m
     w += [Ma]
 
     # X
-    w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated, Pt_ancrage_interpolated = Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, dict_fixed_params)
+    w0_Pt, lbw_Pt, ubw_Pt, Pt_interpolated, Pt_ancrage_interpolated = Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos, dict_fixed_params, trial_name)
     lbw += lbw_Pt
     ubw += ubw_Pt
     w0 += w0_Pt
     w += [X]
 
     # Ma
-    w0_F, lbw_F, ubw_F = F_bounds()
+    w0_F, lbw_F, ubw_F = F_bounds(initial_guess, trial_name)
     w0 += list(w0_F)
     lbw += list(lbw_F)
     ubw += list(ubw_F)
@@ -263,8 +274,7 @@ def main():
     ]  # This range repends on the trial. To find it, one should use the code plateforme_verification_toutesversions.py.
     dt = 1 / 500  # Hz
 
-    initial_guess = InitialGuessType.SURFACE_INTERPOLATION
-    optimize_static_mass = False
+    initial_guess = InitialGuessType.GACO
 
     dict_fixed_params = Param_fixe()
     Fs_totale_collecte, Pts_collecte, labels, ind_masse, Pts_ancrage = get_list_results_dynamic(
@@ -274,6 +284,7 @@ def main():
     ########################################################################################################################
 
     for idx, frame in enumerate(list(range(jump_frame_index_interval[0], jump_frame_index_interval[1]))):
+        trial_name_this_time = f"results_multiple_static_optim_in_a_row/{trial_name}/frame{frame}"
         w_opt, Pt_interpolated, F_totale_collecte, ind_masse, labels, Pt_ancrage_interpolated, dict_fixed_params, cost, status = Optimisation(
             Fs_totale_collecte[idx, :],
             Pts_collecte[idx, :, :],
@@ -281,10 +292,9 @@ def main():
             ind_masse,
             Pts_ancrage[idx, :, :],
             weight,
-            trial_name,
             initial_guess,
-            optimize_static_mass,
             dict_fixed_params,
+            trial_name_this_time,
         )
 
         Ma = np.array(w_opt[0:5])
