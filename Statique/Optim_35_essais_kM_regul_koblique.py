@@ -184,6 +184,17 @@ def Param_variable(k_type):
     :return: k: cas.MX(Nb_ressorts): ensemble des raideurs des ressorts non obliques, dont ressorts du cadre
     :return: k_oblique: cas.MX(Nb_ressorts_croix): ensemble des raideurs des ressorts obliques
     """
+
+    if type(k_type) == cas.MX:
+        zero_fcn = cas.MX.zeros
+        ones_fcn = cas.MX.ones
+    elif type(k_type) == cas.DM:
+        zero_fcn = cas.DM.zeros
+        ones_fcn = cas.DM.ones
+    elif type(k_type) == np.ndarray:
+        zero_fcn = np.zeros
+        ones_fcn = np.ones
+
     # RAIDEURS A CHANGER
     k1 = k_type[0]  # un type de coin (ressort horizontal)
     k2 = k_type[1]  # ressorts horizontaux du bord (bord vertical)
@@ -199,8 +210,7 @@ def Param_variable(k_type):
     k_oblique_4 = k_type[11]  # ressorts quelconques
 
     # ressorts entre le cadre du trampoline et la toile : k1,k2,k3,k4
-    # k_bord = np.zeros(Nb_ressorts_cadre)
-    k_bord = cas.MX.zeros(Nb_ressorts_cadre)
+    k_bord = zero_fcn((Nb_ressorts_cadre, 1))
     # cotes verticaux de la toile :
     k_bord[0:n], k_bord[n + m : 2 * n + m] = k2, k2
     # cotes horizontaux :
@@ -210,23 +220,27 @@ def Param_variable(k_type):
     k_bord[n], k_bord[n + m - 1], k_bord[2 * n + m], k_bord[2 * (n + m) - 1] = k3, k3, k3, k3
 
     # ressorts horizontaux dans la toile
-    k_horizontaux = k6 * cas.MX.ones(n * (m - 1))
+    k_horizontaux = k6 * ones_fcn((n * (m - 1), 1))
     k_horizontaux[0 : n * (m - 1) : n] = k5  # ressorts horizontaux du bord DE LA TOILE en bas
     k_horizontaux[n - 1 : n * (m - 1) : n] = k5  # ressorts horizontaux du bord DE LA TOILE en haut
 
     # ressorts verticaux dans la toile
-    k_verticaux = k8 * cas.MX.ones(m * (n - 1))
+    k_verticaux = k8 * ones_fcn((m * (n - 1), 1))
     k_verticaux[0 : m * (n - 1) : m] = k7  # ressorts verticaux du bord DE LA TOILE a droite
     k_verticaux[m - 1 : n * m - m : m] = k7  # ressorts verticaux du bord DE LA TOILE a gauche
 
-    k = cas.vertcat(k_horizontaux, k_verticaux)
-    k = cas.vertcat(k_bord, k)
+    if type(k_type) == np.ndarray:
+        k = np.vstack((k_horizontaux, k_verticaux))
+        k = np.vstack((k_bord, k))
+    else:
+        k = cas.vertcat(k_horizontaux, k_verticaux)
+        k = cas.vertcat(k_bord, k)
 
     ######################################################################################################################
 
     # RESSORTS OBLIQUES
     # milieux :
-    k_oblique = cas.MX.zeros(Nb_ressorts_croix)
+    k_oblique = zero_fcn((Nb_ressorts_croix, 1))
 
     # coins :
     k_oblique[0], k_oblique[1] = k_oblique_1, k_oblique_1  # en bas a droite
@@ -253,6 +267,14 @@ def Param_variable(k_type):
 
 
 def Param_variable_masse(ind_masse, Ma):
+
+    if type(Ma) == cas.MX:
+        ones_fcn = cas.MX.ones
+    elif type(Ma) == cas.DM:
+        ones_fcn = cas.DM.ones
+    elif type(Ma) == np.ndarray:
+        ones_fcn = np.ones
+
     Mtrampo = 5.00
     mressort_bord = 0.322
     mressort_coin = 0.553
@@ -269,7 +291,7 @@ def Param_variable_masse(ind_masse, Ma):
         0.25 * (Mtrampo / ((n - 1) * (m - 1))) + mressort_coin + 4 * ((mressort_bord / 2) + mattache)
     )  # masse d un point situé dans un coin
 
-    M = mmilieu * cas.MX.ones(n * m)  # on initialise toutes les masses a celle du centre
+    M = mmilieu * ones_fcn(n * m)  # on initialise toutes les masses a celle du centre
     M[0], M[n - 1], M[n * (m - 1)], M[n * m - 1] = mcoin, mcoin, mcoin, mcoin
     M[n : n * (m - 1) : n] = mpetitbord  # masses du cote bas
     M[2 * n - 1 : n * m - 1 : n] = mpetitbord  # masses du cote haut
@@ -517,36 +539,54 @@ def Force_calc(
     :return: F_masses: cas.MX(n*m,3): force de gravité appliquée à chaque point
     """
 
+    if type(Spring_bout_1) == cas.MX:
+        zero_fcn = cas.MX.zeros
+        norm_fcn = cas.norm_fro
+    elif type(Spring_bout_1) == cas.DM:
+        zero_fcn = cas.DM.zeros
+        norm_fcn = cas.norm_fro
+    elif type(Spring_bout_1) == np.ndarray:
+        zero_fcn = np.zeros
+        norm_fcn = np.linalg.norm
+
     l_repos = dict_fixed_params["l_repos"]
     l_repos_croix = dict_fixed_params["l_repos_croix"]
 
-    F_spring = cas.MX.zeros((Nb_ressorts, 3))
-    Vect_unit_dir_F = cas.MX.zeros((Nb_ressorts, 3))
+    F_spring = zero_fcn((Nb_ressorts, 3))
+    Vect_unit_dir_F = zero_fcn((Nb_ressorts, 3))
     for ispring in range(Nb_ressorts):
-        Vect_unit_dir_F[ispring, :] = (Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]) / cas.norm_fro(
+        vect = (Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]) / norm_fcn(
             Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]
         )
-        elongation = cas.norm_fro(Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]) - l_repos[ispring]
+        for i in range(3):
+            Vect_unit_dir_F[ispring, i] = vect[i]
+        elongation = norm_fcn(Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]) - l_repos[ispring]
         # F_spring[ispring, :] = cas.if_else(elongation > 0,  # Condition
         #     Vect_unit_dir_F[ispring, :] * k[ispring] * elongation,  # if
         #     cas.MX.zeros(1, 3)  # else
         # )
-        F_spring[ispring, :] = Vect_unit_dir_F[ispring, :] * k[ispring] * elongation
+        vect = Vect_unit_dir_F[ispring, :] * k[ispring] * elongation
+        for i in range(3):
+            F_spring[ispring, :] = vect[i]
 
-    F_spring_croix = cas.MX.zeros((Nb_ressorts_croix, 3))
-    Vect_unit_dir_F_croix = cas.MX.zeros((Nb_ressorts, 3))
+    F_spring_croix = zero_fcn((Nb_ressorts_croix, 3))
+    Vect_unit_dir_F_croix = zero_fcn((Nb_ressorts, 3))
     for ispring in range(Nb_ressorts_croix):
-        Vect_unit_dir_F_croix[ispring, :] = (Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) / cas.norm_fro(
+        vect = (Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) / norm_fcn(
             Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]
         )
-        elongation_croix = cas.norm_fro(Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) - l_repos_croix[ispring]
+        for i in range(3):
+            Vect_unit_dir_F_croix[ispring, :] = vect[i]
+        elongation_croix = norm_fcn(Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) - l_repos_croix[ispring]
         # F_spring_croix[ispring, :] = cas.if_else(elongation_croix > 0,  # Condition
         #     Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix, # if
         #     cas.MX.zeros(1, 3)  # else
         # )
-        F_spring_croix[ispring, :] = Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix
+        vect = Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix
+        for i in range(3):
+            F_spring_croix[ispring, :] = vect[i]
 
-    F_masses = cas.MX.zeros((n * m, 3))
+    F_masses = zero_fcn((n * m, 3))
     F_masses[:, 2] = -M * 9.81
 
     return F_spring, F_spring_croix, F_masses
@@ -562,8 +602,15 @@ def Force_point(F_spring, F_spring_croix, F_masses):  # --> resultante des force
     :return: F_point: cas.MX(n*m,3): résultantes des forces en chaque point
     """
 
+    if type(F_spring) == cas.MX:
+        zero_fcn = cas.MX.zeros
+    elif type(F_spring) == cas.DM:
+        zero_fcn = cas.DM.zeros
+    elif type(F_spring) == np.ndarray:
+        zero_fcn = np.zeros
+
     # forces elastiques
-    F_spring_points = cas.MX.zeros((n * m, 3))
+    F_spring_points = zero_fcn((n * m, 3))
 
     # - points des coin de la toile : VERIFIE CEST OK
     F_spring_points[0, :] = (
@@ -990,10 +1037,10 @@ def Resultat_PF_collecte(participant, empty_trial_name, trial_name, frame):
     F_out = F_totale_collecte[frame, :]
 
     # retourner des tableaux casadi
-    F_out_cas = cas.DM.zeros(np.shape(F_out)[0])
+    F_out_cas = np.zeros((np.shape(F_out)[0], 1))
     F_out_cas[:] = F_out[:]
 
-    Pt_out_cas = cas.DM.zeros(np.shape(Pt_out))
+    Pt_out_cas = np.zeros((np.shape(Pt_out), 1))
     Pt_out_cas[:, :] = Pt_out[:, :]
 
     return F_out_cas, Pt_out_cas, labels, ind_marqueur_min
@@ -1007,7 +1054,7 @@ def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
     :return: Pt_interpole: DM(3,135) (même dimension que Pos_repos)
     """
     # liste avec les bons points aux bons endroits, et le reste vaut 0
-    Pt_interpolated = cas.DM.zeros((3, 135))
+    Pt_interpolated = np.zeros((3, 135))
     for ind in range(135):
         if "t" + str(ind) in labels and np.isnan(Pt_collecte[0, labels.index("t" + str(ind))]) == False:
             Pt_interpolated[:, ind] = Pt_collecte[:, labels.index("t" + str(ind))]
@@ -1015,7 +1062,7 @@ def interpolation_collecte(Pt_collecte, Pt_ancrage, labels):
     # séparation des colonnes
     Pt_colonnes = []
     for i in range(9):
-        Pt_colonnei = cas.DM.zeros((3, 17))
+        Pt_colonnei = np.zeros((3, 17))
         Pt_colonnei[:, 0] = Pt_ancrage[2 * (n + m) - 1 - i, :]
         Pt_colonnei[:, 1:16] = Pt_interpolated[:, 15 * i : 15 * (i + 1)]
         Pt_colonnei[:, -1] = Pt_ancrage[n + i, :]
@@ -1052,7 +1099,14 @@ def list2tab(list):
     :param list: MX(n*m*3,1)
     :return: tab: MX(135,3)
     """
-    tab = cas.MX.zeros(135, 3)
+    if type(list) == cas.MX:
+        zero_fcn = cas.MX.zeros
+    elif type(list) == cas.DM:
+        zero_fcn = cas.DM.zeros
+    elif type(list) == np.ndarray:
+        zero_fcn = np.zeros
+
+    tab = zero_fcn((135, 3))
     for ind in range(135):
         for i in range(3):
             tab[ind, i] = list[i + 3 * ind]
@@ -1060,7 +1114,14 @@ def list2tab(list):
 
 
 def tab2list(tab):
-    list = cas.MX.zeros(135 * 3)
+    if type(tab) == cas.MX:
+        zero_fcn = cas.MX.zeros
+    elif type(tab) == cas.DM:
+        zero_fcn = cas.DM.zeros
+    elif type(tab) == np.ndarray:
+        zero_fcn = np.zeros
+
+    list = zero_fcn((135 * 3))
     for i in range(135):
         for j in range(3):
             list[j + 3 * i] = tab[i, j]
@@ -1096,10 +1157,18 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
 
 
 def cost_function(X, K, Ma, Pt_collecte, Pt_ancrage, Pt_interpolated, dict_fixed_params, labels, ind_masse, optimize_static_mass):
+
+    if type(X) == cas.MX:
+        zero_fcn = cas.MX.zeros
+    elif type(X) == cas.DM:
+        zero_fcn = cas.DM.zeros
+    elif type(X) == np.ndarray:
+        zero_fcn = np.zeros
+
     F_totale, F_point = Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma)
     Pt = list2tab(X)
 
-    Difference = cas.MX.zeros(1)
+    Difference = zero_fcn((1, 1))
     for i in range(3):
         for ind in range(n * m):
 
@@ -1136,6 +1205,17 @@ def cost_function(X, K, Ma, Pt_collecte, Pt_ancrage, Pt_interpolated, dict_fixed
 
 
 def longueur_ressort(dict_fixed_params, Pt, Pt_ancrage):
+
+    if type(Pt) == cas.MX:
+        zero_fcn = cas.MX.zeros
+        norm_fcn = cas.norm_fro
+    elif type(Pt) == cas.DM:
+        zero_fcn = cas.DM.zeros
+        norm_fcn = cas.norm_fro
+    elif type(Pt) == np.ndarray:
+        zero_fcn = np.zeros
+        norm_fcn = np.linalg.norm
+
     Pt = list2tab(Pt)
     l_repos = dict_fixed_params["l_repos"]
     l_repos_croix = dict_fixed_params["l_repos_croix"]
@@ -1143,11 +1223,11 @@ def longueur_ressort(dict_fixed_params, Pt, Pt_ancrage):
     Spring_bout_1, Spring_bout_2 = Spring_bouts(Pt, Pt_ancrage)
     Spring_bout_croix_1, Spring_bout_croix_2 = Spring_bouts_croix(Pt)
 
-    delta = cas.MX.zeros(Nb_ressorts_croix + Nb_ressorts)
+    delta = zero_fcn((Nb_ressorts_croix + Nb_ressorts, 1))
     for i in range(Nb_ressorts):
-        delta[i] = np.linalg.norm(Spring_bout_2[i, :] - Spring_bout_1[i, :]) - l_repos[i]
+        delta[i] = norm_fcn(Spring_bout_2[i, :] - Spring_bout_1[i, :]) - l_repos[i]
     for i in range(Nb_ressorts, Nb_ressorts_croix):
-        delta[i] = np.linalg.norm(Spring_bout_croix_2[i, :] - Spring_bout_croix_1[i, :]) - l_repos_croix[i]
+        delta[i] = norm_fcn(Spring_bout_croix_2[i, :] - Spring_bout_croix_1[i, :]) - l_repos_croix[i]
 
     return delta
 

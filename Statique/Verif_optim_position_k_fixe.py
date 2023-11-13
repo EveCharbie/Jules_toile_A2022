@@ -41,10 +41,13 @@ def Param_variable(Masse, ind_masse):
 
     if type(Masse) == cas.MX:
         zero_fcn = cas.MX.zeros
+        ones_fcn = cas.MX.ones
     elif type(Masse) == cas.DM:
         zero_fcn = cas.DM.zeros
+        ones_fcn = cas.DM.ones
     elif type(Masse) == np.ndarray:
         zero_fcn = np.zeros
+        ones_fcn = np.ones
 
     # RESULTS FROM THE STATIC OPTIMIZATION
     k1 = 1.21175669e05
@@ -76,12 +79,16 @@ def Param_variable(Masse, ind_masse):
     k_horizontaux[n - 1 : n * (m - 1) : n] = k5  # ressorts horizontaux du bord DE LA TOILE en haut
 
     # ressorts verticaux dans la toile
-    k_verticaux = k8 * cas.DM.ones(m * (n - 1))
+    k_verticaux = k8 * ones_fcn((m * (n - 1), 1))
     k_verticaux[0 : m * (n - 1) : m] = k7  # ressorts verticaux du bord DE LA TOILE a droite
     k_verticaux[m - 1 : n * m - m : m] = k7  # ressorts verticaux du bord DE LA TOILE a gauche
 
-    k = cas.vertcat(k_horizontaux, k_verticaux)
-    k = cas.vertcat(k_bord, k)
+    if type(Masse) == np.ndarray:
+        k = np.vstack((k_horizontaux, k_verticaux))
+        k = np.vstack((k_bord, k))
+    else:
+        k = cas.vertcat(k_horizontaux, k_verticaux)
+        k = cas.vertcat(k_bord, k)
 
     ######################################################################################################################
 
@@ -126,7 +133,7 @@ def Param_variable(Masse, ind_masse):
     )  # masse d un point situé dans un coin
 
 
-    M = mmilieu * cas.MX.ones(n * m)  # on initialise toutes les masses a celle du centre
+    M = mmilieu * ones_fcn((n * m, 1))  # on initialise toutes les masses a celle du centre
     M[0], M[n - 1], M[n * (m - 1)], M[n * m - 1] = mcoin, mcoin, mcoin, mcoin
     M[n : n * (m - 1) : n] = mpetitbord  # masses du cote bas
     M[2 * n - 1 : n * m - 1 : n] = mpetitbord  # masses du cote haut

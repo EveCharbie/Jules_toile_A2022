@@ -83,8 +83,7 @@ def inequality_constraints_function(X, Pt_ancrage_interpolated, dict_fixed_param
     Spring_bout_croix_1, Spring_bout_croix_2 = Spring_bouts_croix(Pt)
     spring_elongation = - np.linalg.norm(Spring_bout_2 - Spring_bout_1) - dict_fixed_params["l_repos"]
     spring_elongation_croix = - np.linalg.norm(Spring_bout_croix_2 - Spring_bout_croix_1) - dict_fixed_params["l_repos_croix"]
-    g = [spring_elongation] + [spring_elongation_croix]
-    return g
+    return np.hstack((spring_elongation, spring_elongation_croix))
 
 class global_optimisation:
     """
@@ -109,22 +108,18 @@ class global_optimisation:
         This function returns how well did the weightings allow to fit the data to track.
         The OCP is solved in this function.
         """
-        global i_inverse
-        i_inverse += 1
-        print(
-            f"+++++++++++++++++++++++++++ {i_inverse}th evaluation of the cost function +++++++++++++++++++++++++++"
-        )
+
         Ma = x[0:5]
         X = x[5:n*m*3+5]
         F_athl = x[-15:]
 
-        obj = cost_function(X, Ma, F_athl, self.Pt_collecte, self.Pt_ancrage_interpolated, self.dict_fixed_params, self.labels, self.ind_masse)
+        obj = [cost_function(X, Ma, F_athl, self.Pt_collecte, self.Pt_ancrage_interpolated, self.dict_fixed_params, self.labels, self.ind_masse)]
 
         equality_const = equality_constraints_function(Ma, self.Masse_centre)
 
-        inequality_const = inequality_constraints_function(X, self.Pt_ancrage_interpolated, self.dict_fixed_params)
+        inequality_const = list(inequality_constraints_function(X, self.Pt_ancrage_interpolated, self.dict_fixed_params))
 
-        return [obj, equality_const, inequality_const]
+        return obj + equality_const + inequality_const
 
     def get_nobj(self):
         """
@@ -136,7 +131,7 @@ class global_optimisation:
         """
         Number of inequality constraints
         """
-        return 2
+        return 294 + 224
 
     def get_nec(self):
         """
@@ -170,29 +165,37 @@ class global_optimisation:
 
 def solve(prob):
 
-    global i_inverse
-    i_inverse = 0
+    bfe = True
+    seed = 42
+    pop_size = 500
+    num_gen = 150
 
-    algo = pg.algorithm(pg.simulated_annealing())
-    pop = pg.population(prob, size=100)
+    algo = pg.gaco()
+    if bfe:
+        algo.set_bfe(pg.bfe())
+    algo = pg.algorithm(algo)  #pg.ihs
+    bfe_pop = pg.default_bfe() if bfe else None
+    pop = pg.population(prob=prob, size=pop_size, seed=seed)
 
-    epsilon = 1e-8
-    diff = 10000
-    w_opt = None
-    while i_inverse < 100 and diff > epsilon:
-        olf_pop_f = np.min(pop.get_f())
+    # Initialize lists with the best individual per generation
+    list_of_champion_f = [pop.champion_f]
+    list_of_champion_x = [pop.champion_x]
+    for i in range(num_gen):
+        print(f'Evolution: {i + 1} / {num_gen}', end='\r')
         pop = algo.evolve(pop)
-        new_pop_f = np.min(pop.get_f())
-        diff = olf_pop_f - new_pop_f
-        w_opt = pop.get_x()[np.argmin(pop.get_f())]
+        list_of_champion_x.append(pop.champion_x)
+        list_of_champion_f.append(pop.champion_f)
+    print('Evolution finished')
 
-    return w_opt, new_pop_f
+    f_opt = np.min(list_of_champion_f)
+    best_champion_idx = np.where(list_of_champion_f == f_opt)[0][0]
+    w_opt = list_of_champion_x[best_champion_idx]
+
+    return w_opt, f_opt
 
 
 ##########################################################################################################################
 def main():
-
-    global i_inverse
 
     # SELECTION OF THE RESULTS FROM THE DATA COLLECTION
     participant = 1
@@ -243,7 +246,6 @@ def main():
         Pt = np.reshape(w_opt[5:-15], (n * m, 3))
         F_athl = np.reshape(w_opt[-15:], (5, 3))
         print(F_athl)
-        print(i_inverse)
 
         path = f"results_multiple_static_optim_in_a_row/frame{frame}_SA.pkl"
         with open(path, "wb") as file:
