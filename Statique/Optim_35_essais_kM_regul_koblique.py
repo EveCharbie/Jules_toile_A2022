@@ -405,12 +405,10 @@ def Points_ancrage_repos(dict_fixed_params):
 
 def Spring_bouts(Pt, Pt_ancrage):
     """
-
-    :param Pt: cas.MX(n*m,3): coordonnées des n*m points de la toile
-    :param Pt_ancrage: cas.DM(2*n+2*m,3): coordonnées des points du cadre
-
-    :return: Spring_bout_1: cas.MX((Nb_ressorts, 3)): bout 1 de chaque ressort non oblique dont ressorts du cadre
-    :return: Spring_bout_2: cas.MX((Nb_ressorts, 3)): bout 2 de chaque ressort non oblique dont ressorts du cadre
+    Returns the coordinates of the two ends of each spring horizontal and vertical (no diagonal).
+    The first end is the
+    Pt: points on the trampoline bed (n*m,3)
+    Pt_ancrage: points on the frame (2*n+2*m,3)
     """
     if type(Pt) == cas.MX:
         zero_fcn = cas.MX.zeros
@@ -567,7 +565,7 @@ def Force_calc(
         # )
         vect = Vect_unit_dir_F[ispring, :] * k[ispring] * elongation
         for i in range(3):
-            F_spring[ispring, :] = vect[i]
+            F_spring[ispring, i] = vect[i]
 
     F_spring_croix = zero_fcn((Nb_ressorts_croix, 3))
     Vect_unit_dir_F_croix = zero_fcn((Nb_ressorts, 3))
@@ -576,7 +574,7 @@ def Force_calc(
             Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]
         )
         for i in range(3):
-            Vect_unit_dir_F_croix[ispring, :] = vect[i]
+            Vect_unit_dir_F_croix[ispring, i] = vect[i]
         elongation_croix = norm_fcn(Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) - l_repos_croix[ispring]
         # F_spring_croix[ispring, :] = cas.if_else(elongation_croix > 0,  # Condition
         #     Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix, # if
@@ -584,7 +582,7 @@ def Force_calc(
         # )
         vect = Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix
         for i in range(3):
-            F_spring_croix[ispring, :] = vect[i]
+            F_spring_croix[ispring, i] = vect[i]
 
     F_masses = zero_fcn((n * m, 3))
     F_masses[:, 2] = -M * 9.81
@@ -1147,6 +1145,72 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
         Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2, k, k_croix, M, dict_fixed_params
     )
     F_point = Force_point(F_spring, F_spring_croix, F_masses)
+
+    #
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection="3d")
+    # ax.set_box_aspect([1.1, 1.8, 1])
+    # ax.plot(0, 0, -1.2, "ow")
+    #
+    # ax.plot(
+    #     Spring_bout_1[:, 0],
+    #     Spring_bout_1[:, 1],
+    #     Spring_bout_1[:, 2],
+    #     "ob",
+    #     mfc="none",
+    #     alpha=0.5,
+    #     markersize=3,
+    #     label="1",
+    # )
+    #
+    # ax.plot(
+    #     Spring_bout_2[:, 0],
+    #     Spring_bout_2[:, 1],
+    #     Spring_bout_2[:, 2],
+    #     ".r",
+    #     markersize=3,
+    #     label="2",
+    # )
+    # for i in range(Spring_bout_1.shape[0]):
+    #     plt.plot(np.vstack((Spring_bout_1[i, 0], Spring_bout_2[i, 0])),
+    #              np.vstack((Spring_bout_1[i, 1], Spring_bout_2[i, 1])),
+    #              np.vstack((Spring_bout_1[i, 2], Spring_bout_2[i, 2])),
+    #              "-k")
+    # ax.legend()
+    # plt.show()
+    #
+    #
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection="3d")
+    # ax.set_box_aspect([1.1, 1.8, 1])
+    # ax.plot(0, 0, -1.2, "ow")
+    #
+    # ax.plot(
+    #     Spring_bout_croix_1[:, 0],
+    #     Spring_bout_croix_1[:, 1],
+    #     Spring_bout_croix_1[:, 2],
+    #     "ob",
+    #     mfc="none",
+    #     alpha=0.5,
+    #     markersize=3,
+    #     label="1",
+    # )
+    #
+    # ax.plot(
+    #     Spring_bout_croix_2[:, 0],
+    #     Spring_bout_croix_2[:, 1],
+    #     Spring_bout_croix_2[:, 2],
+    #     ".r",
+    #     markersize=3,
+    #     label="2",
+    # )
+    # for i in range(Spring_bout_croix_1.shape[0]):
+    #     plt.plot(np.vstack((Spring_bout_croix_1[i, 0], Spring_bout_croix_2[i, 0])),
+    #              np.vstack((Spring_bout_croix_1[i, 1], Spring_bout_croix_2[i, 1])),
+    #              np.vstack((Spring_bout_croix_1[i, 2], Spring_bout_croix_2[i, 2])),
+    #              "-k")
+    # ax.legend()
+    # plt.show()
 
     F_totale = zero_fcn((3, 1))
     for ind in range(F_point.shape[0]):

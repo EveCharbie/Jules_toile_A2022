@@ -66,10 +66,10 @@ def cost_function(X, Ma, F_athl, Pt_collecte, Pt_ancrage_interpolated, dict_fixe
             else:
                 Difference += (F_point[ind, i]) ** 2
 
-    for ind in range(spring_elongation.shape[0]):
-        Difference += 500 * spring_elongation[ind] ** 2
-    for ind in range(spring_elongation_croix.shape[0]):
-        Difference += 0.01 * spring_elongation_croix[ind] ** 2
+    # for ind in range(spring_elongation.shape[0]):
+    #     Difference += 500 * spring_elongation[ind] ** 2
+    # for ind in range(spring_elongation_croix.shape[0]):
+    #     Difference += 0.01 * spring_elongation_croix[ind] ** 2
 
     return Difference
 
@@ -81,8 +81,8 @@ def inequality_constraints_function(X, Pt_ancrage_interpolated, dict_fixed_param
     Pt = list2tab(X)
     Spring_bout_1, Spring_bout_2 = Spring_bouts(Pt, Pt_ancrage_interpolated)
     Spring_bout_croix_1, Spring_bout_croix_2 = Spring_bouts_croix(Pt)
-    spring_elongation = - np.linalg.norm(Spring_bout_2 - Spring_bout_1) - dict_fixed_params["l_repos"]
-    spring_elongation_croix = - np.linalg.norm(Spring_bout_croix_2 - Spring_bout_croix_1) - dict_fixed_params["l_repos_croix"]
+    spring_elongation = - (np.linalg.norm(Spring_bout_2 - Spring_bout_1) - dict_fixed_params["l_repos"])
+    spring_elongation_croix = - (np.linalg.norm(Spring_bout_croix_2 - Spring_bout_croix_1) - dict_fixed_params["l_repos_croix"])
     return np.hstack((spring_elongation, spring_elongation_croix))
 
 class global_optimisation:
@@ -119,7 +119,7 @@ class global_optimisation:
 
         inequality_const = list(inequality_constraints_function(X, self.Pt_ancrage_interpolated, self.dict_fixed_params))
 
-        return obj + equality_const + inequality_const
+        return obj #  + equality_const + inequality_const
 
     def get_nobj(self):
         """
@@ -131,13 +131,13 @@ class global_optimisation:
         """
         Number of inequality constraints
         """
-        return 294 + 224
+        return 0 # 294 + 224
 
     def get_nec(self):
         """
         Number of equality constraints
         """
-        return 1
+        return 0 # 1
 
     def get_bounds(self):
 
@@ -171,8 +171,8 @@ def solve(prob):
 
     bfe = True
     seed = 42
-    pop_size = 500
-    num_gen = 5000
+    pop_size = 100 # 500
+    num_gen = 150
 
     algo = pg.gaco()
     if bfe:
@@ -185,10 +185,11 @@ def solve(prob):
     list_of_champion_f = [pop.champion_f]
     list_of_champion_x = [pop.champion_x]
     for i in range(num_gen):
-        print(f'Evolution: {i + 1} / {num_gen}', end='\r')
+        print(f'Evolution: {i + 1} / {num_gen} \n')
         pop = algo.evolve(pop)
         list_of_champion_x.append(pop.champion_x)
         list_of_champion_f.append(pop.champion_f)
+        print(pop.champion_f)
     print('Evolution finished')
 
     f_opt = np.min(list_of_champion_f)
@@ -357,6 +358,7 @@ def main():
         ax.legend()
         plt.savefig(f"results_multiple_static_optim_in_a_row/{trial_name}/solution_frame{frame}_gaco.png")
         plt.show()
+        embed()
 
     l_repos = dict_fixed_params["l_repos"]
     l_repos_croix = dict_fixed_params["l_repos_croix"]
