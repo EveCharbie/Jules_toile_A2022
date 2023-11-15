@@ -66,7 +66,6 @@ def k_bounds():
     k_oblique2 = 143529.8253725852  # ressorts des bords verticaux
     k_oblique3 = 200282.72442280647  # ressorts des bords horizontaux
     k_oblique4 = 395528.32183421426  # ressorts obliques quelconques
-    k_croix = 3000  # je sais pas
 
     w0_k = [k1, k2, k3, k4, k5, k6, k7, k8, k_oblique1, k_oblique2, k_oblique3, k_oblique4]
     for i in range(len(w0_k)):

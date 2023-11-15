@@ -94,8 +94,8 @@ def Pt_bounds(initial_guess, Pt_collecte, Pt_ancrage, Pt_repos, Pt_ancrage_repos
 
     for k in range(n * m):
         if np.isnan(Pt_collecte[0, k]):
-            lbw_Pt += [Pt_interpolated[:, k] - 0.1]
-            ubw_Pt += [Pt_interpolated[:, k] + 0.1]
+            lbw_Pt += [Pt_interpolated[:, k] - 0.5]
+            ubw_Pt += [Pt_interpolated[:, k] + 0.5]
             w0_Pt += [Pt_interpolated[:, k]]
         else:
             lbw_Pt += [Pt_collecte[:, k] - 0.05]
