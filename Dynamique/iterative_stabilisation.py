@@ -33,19 +33,38 @@ from optim_dynamique_withoutC_casadi import get_list_results_dynamic, Pt_bounds,
 
 def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, PLOT_FLAG=False):
 
+    # cmap = plt.get_cmap("viridis")
+
     n = 15
     m = 9
 
-    max_iter = 1000
-    epsilon = 1e-3
+    max_iter = 150
+    epsilon = 0.01
     displacement = np.inf
     iteration = 0
     Pts_before = np.zeros((n*m, 3))
     Pts_before[:, :] = Pt_interpolated[:, :].T
-    Pts_after = np.zeros((n*m, 3))
+    Pts_after = np.zeros((n * m, 3))
+    Pts_after[:, :] = Pts_before[:, :]
     while displacement > epsilon and iteration < max_iter:
+
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, projection="3d")
+        # ax.set_box_aspect([1.1, 1.8, 1])
+        # ax.plot(0, 0, -1.2, "ow")
+        # ax.plot(
+        #     Pts_before[:, 0],
+        #     Pts_before[:, 1],
+        #     Pts_before[:, 2],
+        #     "ok",
+        #     mfc="none",
+        #     alpha=0.5,
+        #     markersize=4,
+        #     label="Pts_before",
+        # )
+
         X = tab2list(Pts_before)
-        _, F_point = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma)
+        _, F_point = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma, NO_COMPRESSION=True)
         F_point[ind_masse, :] += F_athl[0:3].T
         F_point[ind_masse + 1, :] += F_athl[3:6].T
         F_point[ind_masse - 1, :] += F_athl[6:9].T
@@ -55,31 +74,65 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
         Pts_after_step = np.zeros((n*m, 3))
         for i in range(Pts_before.shape[0]):
             # norm = np.linalg.norm(F_point[:, i])
-            Pts_after_step[:, i] = Pts_before[:, i] + F_point[:, i] / 10000  #  (norm ** 1/4 * np.tanh(norm)*0.1)  #
+            Pts_after_step[i, :] = Pts_before[i, :] + F_point[i, :] / 5000  #  (norm ** 1/4 * np.tanh(norm)*0.1)  #
+
+        # ax.plot(
+        #     Pts_after_step[:, 0],
+        #     Pts_after_step[:, 1],
+        #     Pts_after_step[:, 2],
+        #     "xk",
+        #     markersize=4,
+        #     label="Full step",
+        # )
 
         good_point_move = np.zeros((n*m, 1))
         num_iter = 0
-        while np.sum(good_point_move) < n*m and num_iter < 10:
+        while np.sum(good_point_move) < n*m and num_iter < 15:
             X = tab2list(Pts_after_step)
-            _, F_point_after_step = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma)
+            _, F_point_after_step = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma, NO_COMPRESSION=True)
             F_point_after_step[ind_masse, :] += F_athl[0:3].T
             F_point_after_step[ind_masse + 1, :] += F_athl[3:6].T
             F_point_after_step[ind_masse - 1, :] += F_athl[6:9].T
             F_point_after_step[ind_masse + 15, :] += F_athl[9:12].T
             F_point_after_step[ind_masse - 15, :] += F_athl[12:15].T
 
-            for i in range(Pts_before.shape[0]):
+            for i in np.where(good_point_move == 0)[0]:
                 if F_point[i, 0] / F_point_after_step[i, 0] > 0 and F_point[i, 1] / F_point_after_step[i, 1] > 0 and F_point[i, 2] / F_point_after_step[i, 2] > 0:
                     Pts_after[i, :] = Pts_after_step[i, :]
                     good_point_move[i] = 1
                 else:
-                    Pts_after_step[i, :] = Pts_before[i, :] + F_point[i, :] / (10000 * (10 ** (num_iter+1)))
+                    Pts_after_step[i, :] = Pts_before[i, :] + F_point[i, :] / (5000 * (10 ** (num_iter+1)))
+
+                    # ax.plot(
+                    #     Pts_after_step[i, 0],
+                    #     Pts_after_step[i, 1],
+                    #     Pts_after_step[i, 2],
+                    #     ".",
+                    #     color=cmap(num_iter/10),
+                    # )
+
             num_iter += 1
             print(num_iter)
-            print(np.where(good_point_move == 0))
+            print(np.where(good_point_move == 0)[0])
+
+        # for i in np.where(good_point_move == 0)[0]:
+        #     Pts_after[i, :] = Pts_after_step[i, :]
+
+        #     ax.plot(
+        #         Pts_after[i, 0],
+        #         Pts_after[i, 1],
+        #         Pts_after[i, 2],
+        #         "or",
+        #         mfc="none",
+        #         alpha=0.5,
+        #         markersize=6,
+        #     )
+        # plt.legend()
+        # plt.show()
 
         displacement = np.linalg.norm(Pts_after - Pts_before, axis=1).sum()
         iteration += 1
+        Pts_before[:, :] = Pts_after[:, :]
 
         print(f"{iteration} : {displacement}")
 
@@ -101,9 +154,9 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
         )
 
         ax.plot(
-            Pt_interpolated[:, 0],
-            Pt_interpolated[:, 1],
-            Pt_interpolated[:, 2],
+            Pt_interpolated[0, :],
+            Pt_interpolated[1, :],
+            Pt_interpolated[2, :],
             "or",
             mfc="none",
             markersize=4,
@@ -119,14 +172,14 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
             label="Pts_after",
         )
         for i in range(m*n):
-            plt.plot(np.vstack((Pts_before[i, 0], Pts_after[i, 0])),
-                     np.vstack((Pts_before[i, 1], Pts_after[i, 1])),
-                     np.vstack((Pts_before[i, 2], Pts_after[i, 2])),
+            plt.plot(np.vstack((Pt_interpolated[0, i], Pts_after[i, 0])),
+                     np.vstack((Pt_interpolated[1, i], Pts_after[i, 1])),
+                     np.vstack((Pt_interpolated[2, i], Pts_after[i, 2])),
                      "-k")
         ax.legend()
         plt.show()
 
-    return Pts
+    return Pts_after, F_point_after_step
 
 
 ##########################################################################################################################
@@ -173,8 +226,9 @@ def main():
 
         Ma = np.array([weight/5, weight/5, weight/5, weight/5, weight/5])
         F_athl = np.zeros((15, ))
+        F_athl[2] = -Fs_totale_collecte[idx, 2] # check force plate orientation for x and y
         K, _, _ = Param_variable(Ma, ind_masse)
-        Pts = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, PLOT_FLAG=True)
+        Pts, F_point_after_step = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, PLOT_FLAG=True)
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")

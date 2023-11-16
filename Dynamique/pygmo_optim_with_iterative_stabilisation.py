@@ -15,7 +15,7 @@ sys.path.append("../")
 from enums import InitialGuessType
 
 sys.path.append("../Statique/")
-from Optim_35_essais_kM_regul_koblique import Param_fixe, Calcul_Pt_F, list2tab, Spring_bouts, Spring_bouts_croix, tab2list
+from Optim_35_essais_kM_regul_koblique import Param_fixe, list2tab, Spring_bouts, Spring_bouts_croix, tab2list
 from modele_dynamique_nxm_DimensionsReelles import (
     Resultat_PF_collecte,
     Point_ancrage,
@@ -34,7 +34,7 @@ from iterative_stabilisation import position_the_points_based_on_the_force
 
 def cost_function(Ma, F_athl, K, Pt_collecte, Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, labels, ind_masse):
 
-    Pt = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse)
+    Pt, F_point_after_step = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, PLOT_FLAG=True)
 
     Difference = 0
     for i in range(3):
@@ -43,6 +43,9 @@ def cost_function(Ma, F_athl, K, Pt_collecte, Pt_interpolated, Pt_ancrage_interp
                 ind_collecte = labels.index("t" + str(ind))
                 if not np.isnan(Pt_collecte[i, ind_collecte]):
                     Difference += 500 * (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
+
+    Difference += np.linalg.norm(F_point_after_step, axis=1).sum() / 100000
+
     return Difference
 
 def equality_constraints_function(Ma, Masse_centre):
@@ -69,8 +72,8 @@ def k_bounds():
     lbw_k = []
     ubw_k = []
     for i in range(len(w0_k)):
-        lbw_k += [w0_k[i] * 0.95]
-        ubw_k += [w0_k[i] * 1.05]
+        lbw_k += [1] * len(w0_k)
+        ubw_k += [1e5] * len(w0_k)
 
     return w0_k, lbw_k, ubw_k
 

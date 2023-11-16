@@ -519,8 +519,7 @@ def Spring_bouts_croix(Pt):  # sx
     return Spring_bout_croix_1, Spring_bout_croix_2
 
 
-def Force_calc(
-    Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2, k, k_oblique, M, dict_fixed_params
+def Force_calc(Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2, k, k_oblique, M, dict_fixed_params, NO_COMPRESSION=False
 ):  # force dans chaque ressort
     """
 
@@ -559,13 +558,21 @@ def Force_calc(
         for i in range(3):
             Vect_unit_dir_F[ispring, i] = vect[i]
         elongation = norm_fcn(Spring_bout_2[ispring, :] - Spring_bout_1[ispring, :]) - l_repos[ispring]
-        # F_spring[ispring, :] = cas.if_else(elongation > 0,  # Condition
-        #     Vect_unit_dir_F[ispring, :] * k[ispring] * elongation,  # if
-        #     cas.MX.zeros(1, 3)  # else
-        # )
         vect = Vect_unit_dir_F[ispring, :] * k[ispring] * elongation
         for i in range(3):
-            F_spring[ispring, i] = vect[i]
+            if NO_COMPRESSION:
+                if type(Spring_bout_1) == np.ndarray:
+                    if elongation > 0:
+                        F_spring[ispring, i] = vect[i]
+                    else:
+                        F_spring[ispring, i] = 0
+                else:
+                    F_spring[ispring, :] = cas.if_else(elongation > 0,  # Condition
+                                                   Vect_unit_dir_F[ispring, :] * k[ispring] * elongation,  # if
+                                                   cas.MX.zeros(1, 3)  # else
+                                                   )
+            else:
+                F_spring[ispring, i] = vect[i]
 
     F_spring_croix = zero_fcn((Nb_ressorts_croix, 3))
     Vect_unit_dir_F_croix = zero_fcn((Nb_ressorts, 3))
@@ -576,13 +583,21 @@ def Force_calc(
         for i in range(3):
             Vect_unit_dir_F_croix[ispring, i] = vect[i]
         elongation_croix = norm_fcn(Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) - l_repos_croix[ispring]
-        # F_spring_croix[ispring, :] = cas.if_else(elongation_croix > 0,  # Condition
-        #     Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix, # if
-        #     cas.MX.zeros(1, 3)  # else
-        # )
         vect = Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix
         for i in range(3):
-            F_spring_croix[ispring, i] = vect[i]
+            if NO_COMPRESSION:
+                if type(Spring_bout_1) == np.ndarray:
+                    if elongation_croix > 0:
+                        F_spring_croix[ispring, i] = vect[i]
+                    else:
+                        F_spring_croix[ispring, i] = 0
+                else:
+                    F_spring_croix[ispring, :] = cas.if_else(elongation_croix > 0,  # Condition
+                                                   Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix,  # if
+                                                   cas.MX.zeros(1, 3)  # else
+                                                   )
+            else:
+                F_spring_croix[ispring, i] = vect[i]
 
     F_masses = zero_fcn((n * m, 3))
     F_masses[:, 2] = -M * 9.81
@@ -1126,7 +1141,7 @@ def tab2list(tab):
     return list
 
 
-def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
+def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, NO_COMPRESSION=False):
 
     if type(X) == cas.MX:
         zero_fcn = cas.MX.zeros
@@ -1142,7 +1157,7 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma):
     Spring_bout_1, Spring_bout_2 = Spring_bouts(Pt, Pt_ancrage)
     Spring_bout_croix_1, Spring_bout_croix_2 = Spring_bouts_croix(Pt)
     F_spring, F_spring_croix, F_masses = Force_calc(
-        Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2, k, k_croix, M, dict_fixed_params
+        Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2, k, k_croix, M, dict_fixed_params, NO_COMPRESSION
     )
     F_point = Force_point(F_spring, F_spring_croix, F_masses)
 
