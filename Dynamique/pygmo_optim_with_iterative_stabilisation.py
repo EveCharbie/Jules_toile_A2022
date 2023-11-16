@@ -17,18 +17,10 @@ from enums import InitialGuessType
 sys.path.append("../Statique/")
 from Optim_35_essais_kM_regul_koblique import Param_fixe, list2tab, Spring_bouts, Spring_bouts_croix, tab2list
 from modele_dynamique_nxm_DimensionsReelles import (
-    Resultat_PF_collecte,
-    Point_ancrage,
-    Point_toile_init,
     Points_ancrage_repos,
-    surface_interpolation_collecte,
-    spring_bouts_collecte,
-    static_forces_calc,
-    static_force_in_each_point,
     multiple_shooting_integration,
 )
 from Optim_multi_essais_kM_regul_koblique import m_bounds, k_bounds
-from Verif_optim_position_k_fixe import Param_variable
 from optim_dynamique_withoutC_casadi import get_list_results_dynamic, Pt_bounds, F_bounds
 from iterative_stabilisation import position_the_points_based_on_the_force
 
@@ -44,14 +36,27 @@ def cost_function(Ma, F_athl, K, Pt_collecte, Pt_interpolated, Pt_ancrage_interp
                 if not np.isnan(Pt_collecte[i, ind_collecte]):
                     Difference += 500 * (Pt[ind, i] - Pt_collecte[i, ind_collecte]) ** 2
 
-    Difference += np.linalg.norm(F_point_after_step, axis=1).sum() / 100000
+    F_total = np.linalg.norm(F_point_after_step.sum(axis=0))
+    Difference += F_total / 100000
 
     return Difference
 
 def equality_constraints_function(Ma, Masse_centre):
+    """
+    The total mass must be the athlete weight.
+    """
     g = [Ma[0] + Ma[1] + Ma[2] + Ma[3] + Ma[4] - Masse_centre]
     return g
 
+def inequality_constraints_function(F_athl, F_collecte):
+    """
+    The total force must be similar to the force measured on the trampoline.
+    g <= 0
+    """
+    norm_athl = np.linalg.norm(np.sum(F_athl.reshape(5, 3), axis=0))
+    norm_collecte = np.linalg.norm(F_collecte)
+    g = [norm_athl - norm_collecte * 1.5, norm_collecte * 0.5 - norm_athl]
+    return g
 
 def k_bounds():
     # RESULTS FROM THE STATIC OPTIMIZATION
@@ -85,7 +90,7 @@ class global_optimisation:
         - get_bounds: The function returning the bounds on the weightings
     """
 
-    def __init__(self, Pt_collecte, Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, labels, ind_masse, Masse_centre, Pt_repos, Pt_ancrage_repos):
+    def __init__(self, Pt_collecte, Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, labels, ind_masse, Masse_centre, Pt_repos, Pt_ancrage_repos, F_collecte):
         self.Pt_collecte = Pt_collecte
         self.Pt_interpolated = Pt_interpolated
         self.Pt_ancrage_interpolated = Pt_ancrage_interpolated
@@ -95,6 +100,7 @@ class global_optimisation:
         self.Masse_centre = Masse_centre
         self.Pt_repos = Pt_repos
         self.Pt_ancrage_repos = Pt_ancrage_repos
+        self.F_collecte = F_collecte
 
     def fitness(self, x):
         """
@@ -106,11 +112,14 @@ class global_optimisation:
         K = x[5:-15]
         F_athl = x[-15:]
 
-        obj = [cost_function(Ma, F_athl, K, self.Pt_collecte, self.Pt_interpolated, self.Pt_ancrage_interpolated, self.dict_fixed_params, self.labels, self.ind_masse)]
+        Difference = cost_function(Ma, F_athl, K, self.Pt_collecte, self.Pt_interpolated, self.Pt_ancrage_interpolated, self.dict_fixed_params, self.labels, self.ind_masse)
+        obj = [Difference]
 
         equality_const = equality_constraints_function(Ma, self.Masse_centre)
 
-        return obj + equality_const
+        inequality_const = inequality_constraints_function(F_athl, -self.F_collecte)
+
+        return obj + equality_const + inequality_const
 
     def get_nobj(self):
         """
@@ -123,6 +132,12 @@ class global_optimisation:
         Number of equality constraints
         """
         return 1
+
+    def get_nic(self):
+        """
+        Number of equality constraints
+        """
+        return 2
 
     def get_bounds(self):
 
@@ -171,67 +186,68 @@ def solve(prob, global_optim):
         Ma = np.array(w_current[0:5])
         K = np.array(w_current[5:-15])
         F_athl = np.reshape(w_current[-15:], (5, 3))
-        Pt = position_the_points_based_on_the_force(global_optim.Pt_interpolated,
-                                                    global_optim.Pt_ancrage_interpolated,
-                                                    global_optim.dict_fixed_params,
-                                                    Ma,
-                                                    F_athl,
-                                                    K,
-                                                    global_optim.ind_masse)
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection="3d")
-        ax.set_box_aspect([1.1, 1.8, 1])
-        ax.plot(0, 0, -1.2, "ow")
-
-        ax.plot(global_optim.Pt_interpolated[0, :],
-                global_optim.Pt_interpolated[1, :],
-                global_optim.Pt_interpolated[2, :],
-                "xb",
-                label="initial guess"
-                )
-        ax.plot(
-            global_optim.Pt_ancrage_interpolated[:, 0],
-            global_optim.Pt_ancrage_interpolated[:, 1],
-            global_optim.Pt_ancrage_interpolated[:, 2],
-            "ok",
-            mfc="none",
-            alpha=0.5,
-            markersize=3,
-            label="Model Frame",
-        )
-        ax.plot(
-            global_optim.Pt_collecte[0, :],
-            global_optim.Pt_collecte[1, :],
-            global_optim.Pt_collecte[2, :],
-            ".b",
-            markersize=3,
-            label="Experimental Trampoline"
-        )
-        ax.plot(
-            Pt[:, 0],
-            Pt[:, 1],
-            Pt[:, 2],
-            "ob",
-            mfc="none",
-            markersize=3,
-            label="Optimized point positions",
-        )
-
-        for ind in range(m*n):
-            plt.plot(np.vstack((Pt[ind, 0], Pt[ind, 0] + F_point[ind, 0] / 100000)),
-                     np.vstack((Pt[ind, 1], Pt[ind, 1] + F_point[ind, 1] / 100000)),
-                     np.vstack((Pt[ind, 2], Pt[ind, 2] + F_point[ind, 2] / 100000)),
-                     "-r")
-
-        for ind, index in enumerate([ind_masse, ind_masse-1, ind_masse+1, ind_masse-15, ind_masse+15]):
-            plt.plot(np.vstack((Pt[index, 0], Pt[index, 0] + F_athl[ind, 0] / 100000)),
-                     np.vstack((Pt[index, 1], Pt[index, 1] + F_athl[ind, 1] / 100000)),
-                     np.vstack((Pt[index, 2], Pt[index, 2] + F_athl[ind, 2] / 100000)),
-                     "-m")
-
-        ax.legend()
-        plt.savefig(f"results_multiple_static_optim_in_a_row/{trial_name}/solution_frame{frame}_global_k.png")
-        plt.show()
+        print(f"{i}th generation: K = {K}, cost = {pop.champion_f}")
+        # Pt = position_the_points_based_on_the_force(global_optim.Pt_interpolated,
+        #                                             global_optim.Pt_ancrage_interpolated,
+        #                                             global_optim.dict_fixed_params,
+        #                                             Ma,
+        #                                             F_athl,
+        #                                             K,
+        #                                             global_optim.ind_masse)
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, projection="3d")
+        # ax.set_box_aspect([1.1, 1.8, 1])
+        # ax.plot(0, 0, -1.2, "ow")
+        #
+        # ax.plot(global_optim.Pt_interpolated[0, :],
+        #         global_optim.Pt_interpolated[1, :],
+        #         global_optim.Pt_interpolated[2, :],
+        #         "xb",
+        #         label="initial guess"
+        #         )
+        # ax.plot(
+        #     global_optim.Pt_ancrage_interpolated[:, 0],
+        #     global_optim.Pt_ancrage_interpolated[:, 1],
+        #     global_optim.Pt_ancrage_interpolated[:, 2],
+        #     "ok",
+        #     mfc="none",
+        #     alpha=0.5,
+        #     markersize=3,
+        #     label="Model Frame",
+        # )
+        # ax.plot(
+        #     global_optim.Pt_collecte[0, :],
+        #     global_optim.Pt_collecte[1, :],
+        #     global_optim.Pt_collecte[2, :],
+        #     ".b",
+        #     markersize=3,
+        #     label="Experimental Trampoline"
+        # )
+        # ax.plot(
+        #     Pt[:, 0],
+        #     Pt[:, 1],
+        #     Pt[:, 2],
+        #     "ob",
+        #     mfc="none",
+        #     markersize=3,
+        #     label="Optimized point positions",
+        # )
+        #
+        # for ind in range(m*n):
+        #     plt.plot(np.vstack((Pt[ind, 0], Pt[ind, 0] + F_point[ind, 0] / 100000)),
+        #              np.vstack((Pt[ind, 1], Pt[ind, 1] + F_point[ind, 1] / 100000)),
+        #              np.vstack((Pt[ind, 2], Pt[ind, 2] + F_point[ind, 2] / 100000)),
+        #              "-r")
+        #
+        # for ind, index in enumerate([ind_masse, ind_masse-1, ind_masse+1, ind_masse-15, ind_masse+15]):
+        #     plt.plot(np.vstack((Pt[index, 0], Pt[index, 0] + F_athl[ind, 0] / 100000)),
+        #              np.vstack((Pt[index, 1], Pt[index, 1] + F_athl[ind, 1] / 100000)),
+        #              np.vstack((Pt[index, 2], Pt[index, 2] + F_athl[ind, 2] / 100000)),
+        #              "-m")
+        #
+        # ax.legend()
+        # plt.savefig(f"results_multiple_static_optim_in_a_row/{trial_name}/solution_frame{frame}_global_k.png")
+        # plt.show()
 
     print('Evolution finished')
 
@@ -293,7 +309,8 @@ def main():
                     ind_masse,
                     weight,
                     Pt_repos,
-                    Pt_ancrage_repos
+                    Pt_ancrage_repos,
+                    Fs_totale_collecte[idx, :],
                 )
         prob = pg.problem(global_optim)
         w_opt, cost = solve(prob, global_optim)
