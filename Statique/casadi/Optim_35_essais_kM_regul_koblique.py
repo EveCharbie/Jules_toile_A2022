@@ -177,7 +177,7 @@ def Param_fixe():
     return dict_fixed_params  # np
 
 
-def Param_variable(k_type):
+def Param_variable(k_type, WITH_K_OBLIQUE):
     """
     Répartir les raideurs des ressorts à partir des différents types de ressorts
     :param k_type: cas.MX(12): les 12 types de ressorts qu'on retrouve dans la toile (8 structurels, 4 cisaillement)
@@ -204,10 +204,11 @@ def Param_variable(k_type):
     k6 = k_type[5]  # ressorts horizontaux
     k7 = k_type[6]  # ressorts verticaux du bord vertical de la toile
     k8 = k_type[7]  # ressorts verticaux
-    k_oblique_1 = k_type[8]  # 4 ressorts des coins
-    k_oblique_2 = k_type[9]  # ressorts des bords verticaux
-    k_oblique_3 = k_type[10]  # ressorts des bords horizontaux
-    k_oblique_4 = k_type[11]  # ressorts quelconques
+    if WITH_K_OBLIQUE:
+        k_oblique_1 = k_type[8]  # 4 ressorts des coins
+        k_oblique_2 = k_type[9]  # ressorts des bords verticaux
+        k_oblique_3 = k_type[10]  # ressorts des bords horizontaux
+        k_oblique_4 = k_type[11]  # ressorts quelconques
 
     # ressorts entre le cadre du trampoline et la toile : k1,k2,k3,k4
     k_bord = zero_fcn((Nb_ressorts_cadre, 1))
@@ -240,25 +241,28 @@ def Param_variable(k_type):
 
     # RESSORTS OBLIQUES
     # milieux :
-    k_oblique = zero_fcn((Nb_ressorts_croix, 1))
+    if WITH_K_OBLIQUE:
+        k_oblique = zero_fcn((Nb_ressorts_croix, 1))
 
-    # coins :
-    k_oblique[0], k_oblique[1] = k_oblique_1, k_oblique_1  # en bas a droite
-    k_oblique[2 * (n - 1) - 1], k_oblique[2 * (n - 1) - 2] = k_oblique_1, k_oblique_1  # en haut a droite
-    k_oblique[Nb_ressorts_croix - 1], k_oblique[Nb_ressorts_croix - 2] = k_oblique_1, k_oblique_1  # en haut a gauche
-    k_oblique[2 * (n - 1) * (m - 2)], k_oblique[2 * (n - 1) * (m - 2) + 1] = k_oblique_1, k_oblique_1  # en bas a gauche
+        # coins :
+        k_oblique[0], k_oblique[1] = k_oblique_1, k_oblique_1  # en bas a droite
+        k_oblique[2 * (n - 1) - 1], k_oblique[2 * (n - 1) - 2] = k_oblique_1, k_oblique_1  # en haut a droite
+        k_oblique[Nb_ressorts_croix - 1], k_oblique[Nb_ressorts_croix - 2] = k_oblique_1, k_oblique_1  # en haut a gauche
+        k_oblique[2 * (n - 1) * (m - 2)], k_oblique[2 * (n - 1) * (m - 2) + 1] = k_oblique_1, k_oblique_1  # en bas a gauche
 
-    # côtés verticaux :
-    k_oblique[2 : 2 * (n - 1) - 2] = k_oblique_2  # côté droit
-    k_oblique[2 * (n - 1) * (m - 2) + 2 : Nb_ressorts_croix - 2] = k_oblique_2  # côté gauche
+        # côtés verticaux :
+        k_oblique[2 : 2 * (n - 1) - 2] = k_oblique_2  # côté droit
+        k_oblique[2 * (n - 1) * (m - 2) + 2 : Nb_ressorts_croix - 2] = k_oblique_2  # côté gauche
 
-    # côtés horizontaux :
-    k_oblique[28:169:28], k_oblique[29:170:28] = k_oblique_3, k_oblique_3  # en bas
-    k_oblique[55:196:28], k_oblique[54:195:28] = k_oblique_3, k_oblique_3  # en haut
+        # côtés horizontaux :
+        k_oblique[28:169:28], k_oblique[29:170:28] = k_oblique_3, k_oblique_3  # en bas
+        k_oblique[55:196:28], k_oblique[54:195:28] = k_oblique_3, k_oblique_3  # en haut
 
-    # milieu :
-    for j in range(1, 7):
-        k_oblique[2 + 2 * j * (n - 1) : 26 + 2 * j * (n - 1)] = k_oblique_4
+        # milieu :
+        for j in range(1, 7):
+            k_oblique[2 + 2 * j * (n - 1) : 26 + 2 * j * (n - 1)] = k_oblique_4
+    else:
+        k_oblique = None
 
     return k, k_oblique
 
@@ -574,30 +578,33 @@ def Force_calc(Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_cr
             else:
                 F_spring[ispring, i] = vect[i]
 
-    F_spring_croix = zero_fcn((Nb_ressorts_croix, 3))
-    Vect_unit_dir_F_croix = zero_fcn((Nb_ressorts, 3))
-    for ispring in range(Nb_ressorts_croix):
-        vect = (Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) / norm_fcn(
-            Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]
-        )
-        for i in range(3):
-            Vect_unit_dir_F_croix[ispring, i] = vect[i]
-        elongation_croix = norm_fcn(Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) - l_repos_croix[ispring]
-        vect = Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix
-        for i in range(3):
-            if NO_COMPRESSION:
-                if type(Spring_bout_1) == np.ndarray:
-                    if elongation_croix > 0:
-                        F_spring_croix[ispring, i] = vect[i]
+    if k_oblique is not None:
+        F_spring_croix = zero_fcn((Nb_ressorts_croix, 3))
+        Vect_unit_dir_F_croix = zero_fcn((Nb_ressorts, 3))
+        for ispring in range(Nb_ressorts_croix):
+            vect = (Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) / norm_fcn(
+                Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]
+            )
+            for i in range(3):
+                Vect_unit_dir_F_croix[ispring, i] = vect[i]
+            elongation_croix = norm_fcn(Spring_bout_croix_2[ispring, :] - Spring_bout_croix_1[ispring, :]) - l_repos_croix[ispring]
+            vect = Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix
+            for i in range(3):
+                if NO_COMPRESSION:
+                    if type(Spring_bout_1) == np.ndarray:
+                        if elongation_croix > 0:
+                            F_spring_croix[ispring, i] = vect[i]
+                        else:
+                            F_spring_croix[ispring, i] = 0
                     else:
-                        F_spring_croix[ispring, i] = 0
+                        F_spring_croix[ispring, :] = cas.if_else(elongation_croix > 0,  # Condition
+                                                       Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix,  # if
+                                                       cas.MX.zeros(1, 3)  # else
+                                                       )
                 else:
-                    F_spring_croix[ispring, :] = cas.if_else(elongation_croix > 0,  # Condition
-                                                   Vect_unit_dir_F_croix[ispring, :] * k_oblique[ispring] * elongation_croix,  # if
-                                                   cas.MX.zeros(1, 3)  # else
-                                                   )
-            else:
-                F_spring_croix[ispring, i] = vect[i]
+                    F_spring_croix[ispring, i] = vect[i]
+    else:
+        F_spring_croix = None
 
     F_masses = zero_fcn((n * m, 3))
     F_masses[:, 2] = -M * 9.81
@@ -1141,7 +1148,7 @@ def tab2list(tab):
     return list
 
 
-def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, NO_COMPRESSION=False):
+def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, WITH_K_OBLIQUE, NO_COMPRESSION=False):
 
     if type(X) == cas.MX:
         zero_fcn = cas.MX.zeros
@@ -1150,7 +1157,7 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, NO_COMPRESSI
     elif type(X) == np.ndarray:
         zero_fcn = np.zeros
 
-    k, k_croix = Param_variable(K)
+    k, k_croix = Param_variable(K, WITH_K_OBLIQUE)
     M = Param_variable_masse(ind_masse, Ma)
     Pt = list2tab(X)
 
@@ -1159,6 +1166,9 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse, Ma, NO_COMPRESSI
     F_spring, F_spring_croix, F_masses = Force_calc(
         Spring_bout_1, Spring_bout_2, Spring_bout_croix_1, Spring_bout_croix_2, k, k_croix, M, dict_fixed_params, NO_COMPRESSION
     )
+
+    if not WITH_K_OBLIQUE:
+        F_spring_croix = np.zeros(Spring_bout_croix_1.shape)
     F_point = Force_point(F_spring, F_spring_croix, F_masses)
 
     #

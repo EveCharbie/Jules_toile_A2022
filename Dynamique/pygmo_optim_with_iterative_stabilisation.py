@@ -14,7 +14,7 @@ import sys
 sys.path.append("../")
 from enums import InitialGuessType
 
-sys.path.append("../Statique/")
+sys.path.append("../Statique/casadi/")
 from Optim_35_essais_kM_regul_koblique import Param_fixe, list2tab, Spring_bouts, Spring_bouts_croix, tab2list
 from modele_dynamique_nxm_DimensionsReelles import (
     Points_ancrage_repos,
@@ -24,9 +24,12 @@ from Optim_multi_essais_kM_regul_koblique import m_bounds, k_bounds
 from optim_dynamique_withoutC_casadi import get_list_results_dynamic, Pt_bounds, F_bounds
 from iterative_stabilisation import position_the_points_based_on_the_force
 
-def cost_function(Ma, F_athl, K, Pt_collecte, Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, labels, ind_masse):
+def cost_function(Ma, F_athl, K, Pt_collecte, Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, labels, ind_masse, WITH_K_OBLIQUE):
 
-    Pt, F_point_after_step = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, PLOT_FLAG=True)
+    n = 15
+    m = 9
+
+    Pt, F_point_after_step = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, WITH_K_OBLIQUE, PLOT_FLAG=True)
 
     Difference = 0
     for i in range(3):
@@ -58,7 +61,7 @@ def inequality_constraints_function(F_athl, F_collecte):
     g = [norm_athl - norm_collecte * 1.5, norm_collecte * 0.5 - norm_athl]
     return g
 
-def k_bounds():
+def k_bounds(WITH_K_OBLIQUE):
     # RESULTS FROM THE STATIC OPTIMIZATION
     k1 = 1.21175669e05
     k2 = 3.20423906e03
@@ -73,12 +76,12 @@ def k_bounds():
     k_oblique3 = 3.89409909e03
     k_oblique4 = 1.04226031e-04
 
-    w0_k = [k1, k2, k3, k4, k5, k6, k7, k8, k_oblique1, k_oblique2, k_oblique3, k_oblique4]
-    lbw_k = []
-    ubw_k = []
-    for i in range(len(w0_k)):
-        lbw_k += [1] * len(w0_k)
-        ubw_k += [1e5] * len(w0_k)
+    w0_k = [k1, k2, k3, k4, k5, k6, k7, k8]
+    if WITH_K_OBLIQUE:
+        w0_k += [k_oblique1, k_oblique2, k_oblique3, k_oblique4]
+
+    lbw_k = [1e2] * len(w0_k)
+    ubw_k = [1e5] * len(w0_k)
 
     return w0_k, lbw_k, ubw_k
 
@@ -90,7 +93,7 @@ class global_optimisation:
         - get_bounds: The function returning the bounds on the weightings
     """
 
-    def __init__(self, Pt_collecte, Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, labels, ind_masse, Masse_centre, Pt_repos, Pt_ancrage_repos, F_collecte):
+    def __init__(self, Pt_collecte, Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, labels, ind_masse, Masse_centre, Pt_repos, Pt_ancrage_repos, F_collecte, WITH_K_OBLIQUE):
         self.Pt_collecte = Pt_collecte
         self.Pt_interpolated = Pt_interpolated
         self.Pt_ancrage_interpolated = Pt_ancrage_interpolated
@@ -101,6 +104,7 @@ class global_optimisation:
         self.Pt_repos = Pt_repos
         self.Pt_ancrage_repos = Pt_ancrage_repos
         self.F_collecte = F_collecte
+        self.WITH_K_OBLIQUE = WITH_K_OBLIQUE
 
     def fitness(self, x):
         """
@@ -109,15 +113,21 @@ class global_optimisation:
         """
 
         Ma = x[0:5]
-        K = x[5:-15]
-        F_athl = x[-15:]
+        if self.F_collecte is not None:
+            K = x[5:-15]
+            F_athl = x[-15:]
+        else:
+            F_athl = None
+            K = x[5:]
 
-        Difference = cost_function(Ma, F_athl, K, self.Pt_collecte, self.Pt_interpolated, self.Pt_ancrage_interpolated, self.dict_fixed_params, self.labels, self.ind_masse)
+        Difference = cost_function(Ma, F_athl, K, self.Pt_collecte, self.Pt_interpolated, self.Pt_ancrage_interpolated, self.dict_fixed_params, self.labels, self.ind_masse, self.WITH_K_OBLIQUE)
         obj = [Difference]
 
         equality_const = equality_constraints_function(Ma, self.Masse_centre)
 
-        inequality_const = inequality_constraints_function(F_athl, -self.F_collecte)
+        inequality_const = []
+        if self.F_collecte is not None:
+            inequality_const = inequality_constraints_function(F_athl, -self.F_collecte)
 
         return obj + equality_const + inequality_const
 
@@ -137,20 +147,23 @@ class global_optimisation:
         """
         Number of equality constraints
         """
-        return 2
+        return 2 if self.F_collecte is not None else 0
 
     def get_bounds(self):
 
         _, lbw_m, ubw_m = m_bounds(self.Masse_centre, None, None)
 
-        _, lbw_k, ubw_k = k_bounds()
+        _, lbw_k, ubw_k = k_bounds(self.WITH_K_OBLIQUE)
 
-        _, lbw_F, ubw_F = F_bounds(None, None)
-        lbw_F = list(lbw_F)
-        ubw_F = list(ubw_F)
+        lbx = lbw_m + lbw_k
+        ubx = ubw_m + ubw_k
 
-        lbx = lbw_m + lbw_k + lbw_F
-        ubx = ubw_m + ubw_k + ubw_F
+        if self.F_collecte is not None:
+            _, lbw_F, ubw_F = F_bounds(None, None)
+            lbw_F = list(lbw_F)
+            ubw_F = list(ubw_F)
+            lbx += lbw_F
+            ubx += ubw_F
 
         return (lbx, ubx)
 
@@ -283,7 +296,7 @@ def main():
 
     dict_fixed_params = Param_fixe()
     Fs_totale_collecte, Pts_collecte, labels, ind_masse, Pts_ancrage = get_list_results_dynamic(
-        participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval
+        participant, empty_trial_name, trial_name, jump_frame_index_interval
     )
 
     ########################################################################################################################
@@ -311,6 +324,7 @@ def main():
                     Pt_repos,
                     Pt_ancrage_repos,
                     Fs_totale_collecte[idx, :],
+                    WITH_K_OBLIQUE=False,
                 )
         prob = pg.problem(global_optim)
         w_opt, cost = solve(prob, global_optim)
