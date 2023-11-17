@@ -9,11 +9,12 @@ import time
 import pickle
 import os
 import sys
+from datetime import datetime
 
-sys.path.append("../")
+sys.path.append("../../")
 from enums import InitialGuessType
 
-sys.path.append("../Statique/")
+sys.path.append("../Statique/casadi/")
 from Optim_35_essais_kM_regul_koblique import Param_fixe, Calcul_Pt_F, list2tab, Spring_bouts, Spring_bouts_croix, tab2list
 from modele_dynamique_nxm_DimensionsReelles import (
     Resultat_PF_collecte,
@@ -31,9 +32,9 @@ from Verif_optim_position_k_fixe import Param_variable
 from optim_dynamique_withoutC_casadi import get_list_results_dynamic, Pt_bounds, F_bounds
 
 
-def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, PLOT_FLAG=False):
+def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, WITH_K_OBLIQUE, PLOT_FLAG=False):
 
-    # cmap = plt.get_cmap("viridis")
+    cmap = plt.get_cmap("viridis")
 
     n = 15
     m = 9
@@ -64,12 +65,13 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
         # )
 
         X = tab2list(Pts_before)
-        _, F_point = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma, NO_COMPRESSION=True)
-        F_point[ind_masse, :] += F_athl[0:3].T
-        F_point[ind_masse + 1, :] += F_athl[3:6].T
-        F_point[ind_masse - 1, :] += F_athl[6:9].T
-        F_point[ind_masse + 15, :] += F_athl[9:12].T
-        F_point[ind_masse - 15, :] += F_athl[12:15].T
+        _, F_point = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma, WITH_K_OBLIQUE=WITH_K_OBLIQUE, NO_COMPRESSION=True)
+        if F_athl is not None:
+            F_point[ind_masse, :] += F_athl[0:3].T
+            F_point[ind_masse + 1, :] += F_athl[3:6].T
+            F_point[ind_masse - 1, :] += F_athl[6:9].T
+            F_point[ind_masse + 15, :] += F_athl[9:12].T
+            F_point[ind_masse - 15, :] += F_athl[12:15].T
 
         Pts_after_step = np.zeros((n*m, 3))
         for i in range(Pts_before.shape[0]):
@@ -89,15 +91,16 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
         num_iter = 0
         while np.sum(good_point_move) < n*m and num_iter < 15:
             X = tab2list(Pts_after_step)
-            _, F_point_after_step = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma, NO_COMPRESSION=True)
-            F_point_after_step[ind_masse, :] += F_athl[0:3].T
-            F_point_after_step[ind_masse + 1, :] += F_athl[3:6].T
-            F_point_after_step[ind_masse - 1, :] += F_athl[6:9].T
-            F_point_after_step[ind_masse + 15, :] += F_athl[9:12].T
-            F_point_after_step[ind_masse - 15, :] += F_athl[12:15].T
+            _, F_point_after_step = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma, WITH_K_OBLIQUE=WITH_K_OBLIQUE, NO_COMPRESSION=True)
+            if F_athl is not None:
+                F_point_after_step[ind_masse, :] += F_athl[0:3].T
+                F_point_after_step[ind_masse + 1, :] += F_athl[3:6].T
+                F_point_after_step[ind_masse - 1, :] += F_athl[6:9].T
+                F_point_after_step[ind_masse + 15, :] += F_athl[9:12].T
+                F_point_after_step[ind_masse - 15, :] += F_athl[12:15].T
 
             for i in np.where(good_point_move == 0)[0]:
-                if F_point[i, 0] / F_point_after_step[i, 0] > 0 and F_point[i, 1] / F_point_after_step[i, 1] > 0 and F_point[i, 2] / F_point_after_step[i, 2] > 0:
+                if (F_point_after_step[i, 0] == 0 or F_point[i, 0] / F_point_after_step[i, 0] > 0) and (F_point_after_step[i, 1] == 0 or F_point[i, 1] / F_point_after_step[i, 1] > 0) and (F_point_after_step[i, 2] == 0 or F_point[i, 2] / F_point_after_step[i, 2] > 0):
                     Pts_after[i, :] = Pts_after_step[i, :]
                     good_point_move[i] = 1
                 else:
@@ -112,11 +115,10 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
                     # )
 
             num_iter += 1
-            print(num_iter)
-            print(np.where(good_point_move == 0)[0])
 
-        # for i in np.where(good_point_move == 0)[0]:
-        #     Pts_after[i, :] = Pts_after_step[i, :]
+        for i in np.where(good_point_move == 0)[0]:
+            # Pts_after[i, :] = Pts_after_step[i, :]
+            Pts_after[i, :] = Pts_before[i, :]
 
         #     ax.plot(
         #         Pts_after[i, 0],
@@ -177,6 +179,8 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
                      np.vstack((Pt_interpolated[2, i], Pts_after[i, 2])),
                      "-k")
         ax.legend()
+        date_str = datetime.now().strftime("%b-%d-%Y-%H-%M-%S")
+        plt.savefig(f"results/{date_str}_1_static.png")
         plt.show()
 
     return Pts_after, F_point_after_step
@@ -207,7 +211,7 @@ def main():
 
     dict_fixed_params = Param_fixe()
     Fs_totale_collecte, Pts_collecte, labels, ind_masse, Pts_ancrage = get_list_results_dynamic(
-        participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval
+        participant, empty_trial_name, trial_name, jump_frame_index_interval
     )
 
     ########################################################################################################################

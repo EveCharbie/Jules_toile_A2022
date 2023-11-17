@@ -661,10 +661,10 @@ def static_force_in_each_point(F_spring, F_spring_croix, F_masses):
     return F_point
 
 
-def Resultat_PF_collecte(participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval):
+def Resultat_PF_collecte(participant, empty_trial_name, trial_name, jump_frame_index_interval):
     def open_c3d(participant, trial_name):
         dossiers = ["statique", "participant_01", "participant_02"]
-        file_path = "../Data/DataCollection/c3d_files/" + dossiers[participant]
+        file_path = "/home/charbie/Documents/Programmation/Jules_toile_A2022/Data/DataCollection/c3d_files/" + dossiers[participant]
         c3d_file = c3d(file_path + "/" + trial_name + ".c3d")
         return c3d_file
 
@@ -791,13 +791,12 @@ def Resultat_PF_collecte(participant, static_trial_name, empty_trial_name, trial
             if i % 4 == 0:
                 platform_new[:, :, i // 4] = platform[:, :, i]
 
-        if participant != 0:
-            platform_new = platform_new[:, :, jump_frame_index_interval[0] : jump_frame_index_interval[1]]
+        platform_new = platform_new[:, :, jump_frame_index_interval[0] : jump_frame_index_interval[1]]
 
         return platform_new
 
-    def soustracting_zero_from_force_plates(c3d_statique, c3d_vide):  # pour les forces calculees par Vicon
-        platform_statique = plateformes_separees_rawpins(c3d_statique)
+    def soustracting_zero_from_force_plates(c3d_experimental, c3d_vide, jump_frame_index_interval, participant):  # pour les forces calculees par Vicon
+        platform_statique = plateformes_separees_rawpins(c3d_experimental)
         platform_vide = plateformes_separees_rawpins(c3d_vide)
         platform = np.copy(platform_statique)
 
@@ -805,12 +804,6 @@ def Resultat_PF_collecte(participant, static_trial_name, empty_trial_name, trial
         for j in range(6):
             for i in range(4):
                 platform[i, j, :] = platform_statique[i, j, :] - np.mean(platform_vide[i, j, :])
-        platform = force_plates_rearangement(platform, 0, 0)
-        return platform
-
-    def dynamics(c3d_experimental, jump_frame_index_interval, participant):
-        platform = plateformes_separees_rawpins(c3d_experimental)
-        platform = soustracting_the_zero_from_force_paltes(platform)
         platform = force_plates_rearangement(platform, jump_frame_index_interval, participant)
         return platform
 
@@ -834,27 +827,6 @@ def Resultat_PF_collecte(participant, static_trial_name, empty_trial_name, trial
         moyenne_milieu = np.array([np.mean(named_positions[i, ind_milieu, :100]) for i in range(3)])
 
         return labels, moyenne_milieu, named_positions
-
-    def static_positions(named_positions, moyenne, named_positions_vide, moyenne_vide):
-        # on soustrait la moyenne de la position du milieu
-        for i in range(3):
-            named_positions[i, :, :] = named_positions[i, :, :] - moyenne_vide[i]
-
-        # on remet les axes dans le meme sens que dans la modelisation
-        named_positions_bonsens = np.copy(named_positions)
-        named_positions_bonsens[0, :, :] = -named_positions[1, :, :]
-        named_positions_bonsens[1, :, :] = named_positions[0, :, :]
-
-        position_moyenne = np.zeros((3, np.shape(named_positions_bonsens)[1]))
-        for ind_print in range(np.shape(named_positions_bonsens)[1]):
-            position_moyenne[:, ind_print] = np.array(
-                [np.mean(named_positions_bonsens[i, ind_print, :100]) for i in range(3)]
-            )
-
-        # passage de mm en m :
-        named_positions_bonsens *= 0.001
-
-        return named_positions_bonsens
 
     def dynamics_position(named_positions, moyenne_milieu, jump_frame_index_interval):
         # on soustrait la moyenne de la position du milieu sur les 100 premiers points
@@ -902,21 +874,12 @@ def Resultat_PF_collecte(participant, static_trial_name, empty_trial_name, trial
 
         return idx_min_dynamique, label_min_dynamique
 
-    if participant == 0:
-        c3d_vide = open_c3d(0, empty_trial_name)
-        c3d_statique = open_c3d(0, static_trial_name)
-        platform = soustracting_zero_from_force_plates(
-            c3d_statique, c3d_vide
-        )  # plateforme statique a laquelle on a soustrait la valeur de la plateforme a vide
-        labels, moyenne_milieu, named_positions = named_markers(c3d_statique)
-        labels_vide, moyenne_milieu_vide, named_positions_vide = named_markers(c3d_vide)
-        Pt_collecte = static_positions(named_positions, moyenne_milieu, named_positions_vide, moyenne_milieu_vide)
-
-    else:
-        c3d_experimental = open_c3d(participant, trial_name)
-        platform = dynamics(c3d_experimental, jump_frame_index_interval, participant)
-        labels, moyenne_milieu, named_positions = named_markers(c3d_experimental)
-        Pt_collecte = dynamics_position(named_positions, moyenne_milieu, jump_frame_index_interval)
+    c3d_vide = open_c3d(0, empty_trial_name)
+    c3d_experimental = open_c3d(participant, trial_name)
+    platform = soustracting_zero_from_force_plates(c3d_experimental, c3d_vide, jump_frame_index_interval, participant)
+    labels, moyenne_milieu, named_positions = named_markers(c3d_experimental)
+    labels_vide, moyenne_milieu_vide, named_positions_vide = named_markers(c3d_vide)
+    Pt_collecte = dynamics_position(named_positions, moyenne_milieu_vide, jump_frame_index_interval)
 
     longueur = np.size(platform[0, 0])
     F_totale_collecte = np.zeros((longueur, 3))
@@ -1576,7 +1539,7 @@ def main():
 
     # Récupération de tous les points des frames de l'intervalle dynamics
     F_totale_collecte, Pt_collecte_tab, labels, ind_masse = Resultat_PF_collecte(
-        participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval
+        participant, empty_trial_name, trial_name, jump_frame_index_interval
     )
 
     # Récupération des parametres du problemes
@@ -1605,7 +1568,7 @@ def main():
     plt.show()
 
     all_F_totale_collecte, all_Pt_collecte_tab, all_labels, all_ind_masse = Resultat_PF_collecte(
-        participant, static_trial_name, empty_trial_name, trial_name, [0, 7763]
+        participant, empty_trial_name, trial_name, [0, 7763]
     )
     all_Pt_ancrage_collecte, label_ancrage = Point_ancrage(all_Pt_collecte_tab, all_labels)
 

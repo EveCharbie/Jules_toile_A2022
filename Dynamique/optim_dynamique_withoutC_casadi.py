@@ -43,9 +43,9 @@ from modele_dynamique_nxm_DimensionsReelles import (
 from Optim_multi_essais_kM_regul_koblique import m_bounds
 from Verif_optim_position_k_fixe import Param_variable
 
-def get_list_results_dynamic(participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval):
+def get_list_results_dynamic(participant, empty_trial_name, trial_name, jump_frame_index_interval):
     F_totale_collecte, Pt_collecte_tab, labels, ind_masse = Resultat_PF_collecte(
-        participant, static_trial_name, empty_trial_name, trial_name, jump_frame_index_interval
+        participant, empty_trial_name, trial_name, jump_frame_index_interval
     )
     Pt_ancrage, labels_ancrage = Point_ancrage(Pt_collecte_tab, labels)
     Pt_collecte, label_toile = Point_toile_init(Pt_collecte_tab, labels)
