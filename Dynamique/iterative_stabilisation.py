@@ -232,7 +232,7 @@ def main():
         F_athl = np.zeros((15, ))
         F_athl[2] = -Fs_totale_collecte[idx, 2] # check force plate orientation for x and y
         K, _, _ = Param_variable(Ma, ind_masse)
-        Pts, F_point_after_step = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, PLOT_FLAG=True)
+        Pts, F_point_after_step = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, WITH_K_OBLIQUE=False, PLOT_FLAG=True)
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
