@@ -12,7 +12,9 @@ import sys
 
 sys.path.append("../")
 sys.path.append("../casadi/")
-sys.path.append("../../Dynamique/")
+sys.path.append("../../Dynamique/casadi")
+sys.path.append("../../Dynamique/iterative_stabilisation")
+sys.path.append("../../Dynamique/data_treatment")
 from enums import InitialGuessType
 from Optim_35_essais_kM_regul_koblique import Param_fixe, list2tab, Spring_bouts, Spring_bouts_croix, tab2list
 from modele_dynamique_nxm_DimensionsReelles import (
@@ -75,48 +77,50 @@ def main():
                                                                   dict_fixed_params,
                                                                   trial_name)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-    ax.set_box_aspect([1.1, 1.8, 1])
-    ax.plot(0, 0, -1.2, "ow")
+    PLOT_INITIAL = False
+    if PLOT_INITIAL:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+        ax.set_box_aspect([1.1, 1.8, 1])
+        ax.plot(0, 0, -1.2, "ow")
 
-    ax.plot(
-        Pt_ancrage_interpolated[:, 0],
-        Pt_ancrage_interpolated[:, 1],
-        Pt_ancrage_interpolated[:, 2],
-        "ok",
-        mfc="none",
-        alpha=0.5,
-        markersize=4,
-        label="Model Frame",
-    )
-    ax.plot(
-        Pts_ancrage[0, :, 0],
-        Pts_ancrage[0, :, 1],
-        Pts_ancrage[0, :, 2],
-        ".k",
-        label="Pts_ancrage",
-    )
+        ax.plot(
+            Pt_ancrage_interpolated[:, 0],
+            Pt_ancrage_interpolated[:, 1],
+            Pt_ancrage_interpolated[:, 2],
+            "ok",
+            mfc="none",
+            alpha=0.5,
+            markersize=4,
+            label="Model Frame",
+        )
+        ax.plot(
+            Pts_ancrage[0, :, 0],
+            Pts_ancrage[0, :, 1],
+            Pts_ancrage[0, :, 2],
+            ".k",
+            label="Pts_ancrage",
+        )
 
-    ax.plot(
-        Pt_interpolated[0, :],
-        Pt_interpolated[1, :],
-        Pt_interpolated[2, :],
-        "or",
-        mfc="none",
-        markersize=4,
-        label="Pt_interpolated",
-    )
-    ax.plot(
-        Pts_collecte[0, :, 0],
-        Pts_collecte[0, :, 1],
-        Pts_collecte[0, :, 2],
-        ".r",
-        label="Pts_collecte",
-    )
+        ax.plot(
+            Pt_interpolated[0, :],
+            Pt_interpolated[1, :],
+            Pt_interpolated[2, :],
+            "or",
+            mfc="none",
+            markersize=4,
+            label="Pt_interpolated",
+        )
+        ax.plot(
+            Pts_collecte[0, :, 0],
+            Pts_collecte[0, :, 1],
+            Pts_collecte[0, :, 2],
+            ".r",
+            label="Pts_collecte",
+        )
 
-    ax.legend()
-    plt.show()
+        ax.legend()
+        plt.show()
 
     global_optim = global_optimisation(
         Pts_collecte[0, :, :],
@@ -132,18 +136,16 @@ def main():
         WITH_K_OBLIQUE=False,
     )
     prob = pg.problem(global_optim)
-    w_opt, cost = solve(prob, global_optim)
+    w_opt, cost = solve(prob)
 
     Ma = np.array(w_opt[0:5])
-    K = np.array(w_opt[5:-15])
-
+    K = np.array(w_opt[5:])
 
     data = {"Ma": Ma,
             "K": K,
             }
     with open(f"results/static_1essai.pkl", "wb") as f:
         pickle.dump(data, f)
-
 
 if __name__ == "__main__":
     main()

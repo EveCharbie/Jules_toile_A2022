@@ -664,7 +664,7 @@ def static_force_in_each_point(F_spring, F_spring_croix, F_masses):
 def Resultat_PF_collecte(participant, empty_trial_name, trial_name, jump_frame_index_interval):
     def open_c3d(participant, trial_name):
         dossiers = ["statique", "participant_01", "participant_02"]
-        file_path = "/home/charbie/Documents/Programmation/Jules_toile_A2022/Data/DataCollection/c3d_files/" + dossiers[participant]
+        file_path = "../../Data/DataCollection/c3d_files/" + dossiers[participant]
         c3d_file = c3d(file_path + "/" + trial_name + ".c3d")
         return c3d_file
 

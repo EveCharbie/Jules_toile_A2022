@@ -35,7 +35,7 @@ import sys
 sys.path.append("../")
 from enums import InitialGuessType
 
-sys.path.append("../Dynamique/")
+sys.path.append("../../Dynamique/data_treatment/")
 from modele_dynamique_nxm_DimensionsReelles import surface_interpolation_collecte
 
 

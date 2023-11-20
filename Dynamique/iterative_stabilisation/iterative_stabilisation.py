@@ -14,7 +14,7 @@ from datetime import datetime
 sys.path.append("../../")
 from enums import InitialGuessType
 
-sys.path.append("../Statique/casadi/")
+sys.path.append("../../Statique/casadi/")
 from Optim_35_essais_kM_regul_koblique import Param_fixe, Calcul_Pt_F, list2tab, Spring_bouts, Spring_bouts_croix, tab2list
 from modele_dynamique_nxm_DimensionsReelles import (
     Resultat_PF_collecte,
@@ -29,6 +29,7 @@ from modele_dynamique_nxm_DimensionsReelles import (
 )
 from Optim_multi_essais_kM_regul_koblique import m_bounds
 from Verif_optim_position_k_fixe import Param_variable
+sys.path.append("../casadi/")
 from optim_dynamique_withoutC_casadi import get_list_results_dynamic, Pt_bounds, F_bounds
 
 
@@ -180,8 +181,8 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
                      "-k")
         ax.legend()
         date_str = datetime.now().strftime("%b-%d-%Y-%H-%M-%S")
-        plt.savefig(f"results/{date_str}_1_static.png")
-        plt.show()
+        plt.savefig(f"../results/{date_str}_1_static.png")
+        # plt.show()
 
     return Pts_after, F_point_after_step
 
@@ -189,24 +190,35 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
 ##########################################################################################################################
 def main():
 
-    # SELECTION OF THE RESULTS FROM THE DATA COLLECTION
-    participant = 1
-    # participant_1: 64.5 kg
-    # participant_2: 87.2 kg
-    weight = 64.5
-    static_trial_name = "labeled_statique_leftfront_D7"
-    trial_name = "labeled_p1_sauthaut_01"
+    # # SELECTION OF THE RESULTS FROM THE DATA COLLECTION
+    # participant = 1
+    # # participant_1: 64.5 kg
+    # # participant_2: 87.2 kg
+    # weight = 64.5
+    # static_trial_name = "labeled_statique_leftfront_D7"
+    # trial_name = "labeled_p1_sauthaut_01"
+    # empty_trial_name = "labeled_statique_centrefront_vide"
+    # jump_frame_index_interval = [
+    #     7101,
+    #     7120,
+    #     # 7170,
+    # ]  # This range repends on the trial. To find it, one should use the code plateforme_verification_toutesversions.py.
+    # dt = 1 / 500  # Hz
+
+
+    # RÉSULTATS COLLECTE STATIC:
+    frame = 700
+    jump_frame_index_interval = [frame, frame+1]
+    participant = 0  # 0 #1 #2
+    nb_disques = 8  # entre 1 et 11
+    trial_name = "labeled_statique_centrefront_D" + str(nb_disques)
     empty_trial_name = "labeled_statique_centrefront_vide"
-    jump_frame_index_interval = [
-        7101,
-        7120,
-        # 7170,
-    ]  # This range repends on the trial. To find it, one should use the code plateforme_verification_toutesversions.py.
-    dt = 1 / 500  # Hz
+    if "front" not in trial_name:
+        empty_trial_name = "labeled_statique_vide"
 
     # if trial_name is not a folder, create it
-    if not os.path.isdir(f"results_multiple_static_optim_in_a_row/{trial_name}"):
-        os.mkdir(f"results_multiple_static_optim_in_a_row/{trial_name}")
+    if not os.path.isdir(f"../results_multiple_static_optim_in_a_row/{trial_name}"):
+        os.mkdir(f"../results_multiple_static_optim_in_a_row/{trial_name}")
 
 
     dict_fixed_params = Param_fixe()
@@ -228,11 +240,17 @@ def main():
                                                                       dict_fixed_params,
                                                                       trial_name)
 
-        Ma = np.array([weight/5, weight/5, weight/5, weight/5, weight/5])
-        F_athl = np.zeros((15, ))
-        F_athl[2] = -Fs_totale_collecte[idx, 2] # check force plate orientation for x and y
-        K, _, _ = Param_variable(Ma, ind_masse)
-        Pts, F_point_after_step = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, PLOT_FLAG=True)
+        # Ma = np.array([weight/5, weight/5, weight/5, weight/5, weight/5])
+        # F_athl = np.zeros((15, ))
+        # F_athl[2] = -Fs_totale_collecte[idx, 2]  # check force plate orientation for x and y
+        # K, _, _ = Param_variable(Ma, ind_masse)
+
+        # Results from 1 trial iterative stabilization (150 generation of 100 ant colonies)
+        K = np.array([67270.97535724, 34996.41722719, 98071.72779287, 13524.08198956, 187.88189615,  2893.82279376, 11633.1145868,  97694.79952442])  # cost = [9.75568108e+04 4.79621395e-03]
+        Ma = np.array([3.73909834e+01, 2.25235116e+01, 3.08040276e+01, 2.87158935e+01, 4.35703801e+01])
+        F_athl = None
+
+        Pts, F_point_after_step = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, WITH_K_OBLIQUE=False, PLOT_FLAG=True)
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")

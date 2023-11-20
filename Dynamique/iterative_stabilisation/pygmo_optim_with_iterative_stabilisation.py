@@ -29,7 +29,7 @@ def cost_function(Ma, F_athl, K, Pt_collecte, Pt_interpolated, Pt_ancrage_interp
     n = 15
     m = 9
 
-    Pt, F_point_after_step = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, WITH_K_OBLIQUE, PLOT_FLAG=True)
+    Pt, F_point_after_step = position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, WITH_K_OBLIQUE, PLOT_FLAG=False)
 
     Difference = 0
     for i in range(3):
@@ -171,12 +171,12 @@ class global_optimisation:
         grad = pg.estimate_gradient_h(lambda x: self.fitness(x), x)
         return grad
 
-def solve(prob, global_optim):
+def solve(prob):
 
     bfe = True
     seed = 42
-    pop_size = 500
-    num_gen = 150
+    pop_size = 100
+    num_gen = 500
 
     algo = pg.gaco()
     if bfe:
@@ -197,9 +197,8 @@ def solve(prob, global_optim):
 
         w_current = pop.champion_x
         Ma = np.array(w_current[0:5])
-        K = np.array(w_current[5:-15])
-        F_athl = np.reshape(w_current[-15:], (5, 3))
-        print(f"{i}th generation: K = {K}, cost = {pop.champion_f}")
+        K = np.array(w_current[5:])
+        print(f"{i}th generation: K = {K}, Ma = {Ma}, cost = {pop.champion_f}")
         # Pt = position_the_points_based_on_the_force(global_optim.Pt_interpolated,
         #                                             global_optim.Pt_ancrage_interpolated,
         #                                             global_optim.dict_fixed_params,
@@ -264,9 +263,13 @@ def solve(prob, global_optim):
 
     print('Evolution finished')
 
-    f_opt = np.min(list_of_champion_f)
-    best_champion_idx = np.where(list_of_champion_f == f_opt)[0][0]
-    w_opt = list_of_champion_x[best_champion_idx]
+    embed()
+    f_opt = np.min(list_of_champion_f[0])
+    g_opt = np.min(list_of_champion_f[1])
+    w_opt = pop.champion_x
+    print(f"f_opt = {f_opt}")
+    print(f"g_opt = {g_opt}")
+    print(f"w_opt = {w_opt}")
 
     return w_opt, f_opt
 
@@ -327,7 +330,7 @@ def main():
                     WITH_K_OBLIQUE=False,
                 )
         prob = pg.problem(global_optim)
-        w_opt, cost = solve(prob, global_optim)
+        w_opt, cost = solve(prob)
 
         Ma = np.array(w_opt[0:5])
         K = np.array(w_opt[5:-15])
