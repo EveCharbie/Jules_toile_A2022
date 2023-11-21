@@ -35,109 +35,137 @@ from optim_dynamique_withoutC_casadi import get_list_results_dynamic, Pt_bounds,
 
 def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, WITH_K_OBLIQUE, PLOT_FLAG=False):
 
-    cmap = plt.get_cmap("viridis")
+    # cmap = plt.get_cmap("viridis")
 
     n = 15
     m = 9
 
     max_iter = 150
     epsilon = 0.01
-    displacement = np.inf
-    iteration = 0
-    Pts_before = np.zeros((n*m, 3))
-    Pts_before[:, :] = Pt_interpolated[:, :].T
-    Pts_after = np.zeros((n * m, 3))
-    Pts_after[:, :] = Pts_before[:, :]
-    while displacement > epsilon and iteration < max_iter:
+    coefficient = 500
+    i_try = 0
+    coefficient_ok = False
+    while i_try < 5 and not coefficient_ok:
+        iteration = 0
+        displacement = [np.inf]
+        Pts_before = np.zeros((n * m, 3))
+        Pts_before[:, :] = Pt_interpolated[:, :].T
+        Pts_after = np.zeros((n * m, 3))
+        Pts_after[:, :] = Pts_before[:, :]
+        while displacement[-1] > epsilon and iteration < max_iter:
 
-        # fig = plt.figure()
-        # ax = fig.add_subplot(111, projection="3d")
-        # ax.set_box_aspect([1.1, 1.8, 1])
-        # ax.plot(0, 0, -1.2, "ow")
-        # ax.plot(
-        #     Pts_before[:, 0],
-        #     Pts_before[:, 1],
-        #     Pts_before[:, 2],
-        #     "ok",
-        #     mfc="none",
-        #     alpha=0.5,
-        #     markersize=4,
-        #     label="Pts_before",
-        # )
+            # if iteration < 5:
+            #     fig = plt.figure()
+            #     ax = fig.add_subplot(111, projection="3d")
+            #     ax.set_box_aspect([1.1, 1.8, 1])
+            #     ax.plot(0, 0, -1.2, "ow")
+            #     ax.plot(
+            #         Pts_before[:, 0],
+            #         Pts_before[:, 1],
+            #         Pts_before[:, 2],
+            #         "ok",
+            #         mfc="none",
+            #         alpha=0.5,
+            #         markersize=4,
+            #         label="Pts_before",
+            #     )
 
-        X = tab2list(Pts_before)
-        _, F_point = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma, WITH_K_OBLIQUE=WITH_K_OBLIQUE, NO_COMPRESSION=True)
-        if F_athl is not None:
-            F_point[ind_masse, :] += F_athl[0:3].T
-            F_point[ind_masse + 1, :] += F_athl[3:6].T
-            F_point[ind_masse - 1, :] += F_athl[6:9].T
-            F_point[ind_masse + 15, :] += F_athl[9:12].T
-            F_point[ind_masse - 15, :] += F_athl[12:15].T
-
-        Pts_after_step = np.zeros((n*m, 3))
-        for i in range(Pts_before.shape[0]):
-            # norm = np.linalg.norm(F_point[:, i])
-            Pts_after_step[i, :] = Pts_before[i, :] + F_point[i, :] / 5000  #  (norm ** 1/4 * np.tanh(norm)*0.1)  #
-
-        # ax.plot(
-        #     Pts_after_step[:, 0],
-        #     Pts_after_step[:, 1],
-        #     Pts_after_step[:, 2],
-        #     "xk",
-        #     markersize=4,
-        #     label="Full step",
-        # )
-
-        good_point_move = np.zeros((n*m, 1))
-        num_iter = 0
-        while np.sum(good_point_move) < n*m and num_iter < 15:
-            X = tab2list(Pts_after_step)
-            _, F_point_after_step = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma, WITH_K_OBLIQUE=WITH_K_OBLIQUE, NO_COMPRESSION=True)
+            X = tab2list(Pts_before)
+            _, F_point = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma, WITH_K_OBLIQUE=WITH_K_OBLIQUE, NO_COMPRESSION=True)
             if F_athl is not None:
-                F_point_after_step[ind_masse, :] += F_athl[0:3].T
-                F_point_after_step[ind_masse + 1, :] += F_athl[3:6].T
-                F_point_after_step[ind_masse - 1, :] += F_athl[6:9].T
-                F_point_after_step[ind_masse + 15, :] += F_athl[9:12].T
-                F_point_after_step[ind_masse - 15, :] += F_athl[12:15].T
+                F_point[ind_masse, :] += F_athl[0:3].T
+                F_point[ind_masse + 1, :] += F_athl[3:6].T
+                F_point[ind_masse - 1, :] += F_athl[6:9].T
+                F_point[ind_masse + 15, :] += F_athl[9:12].T
+                F_point[ind_masse - 15, :] += F_athl[12:15].T
+
+            Pts_after_step = np.zeros((n*m, 3))
+            for i in range(Pts_before.shape[0]):
+                Pts_after_step[i, :] = Pts_before[i, :] + F_point[i, :] / coefficient
+
+            # if iteration < 5:
+            #     ax.plot(
+            #         Pts_after_step[:, 0],
+            #         Pts_after_step[:, 1],
+            #         Pts_after_step[:, 2],
+            #         "xk",
+            #         markersize=4,
+            #         label="Full step",
+            #     )
+
+            good_point_move = np.zeros((n*m, 1))
+            num_iter = 0
+            while np.sum(good_point_move) < n*m and num_iter < 15:
+                X = tab2list(Pts_after_step)
+                _, F_point_after_step = Calcul_Pt_F(X, Pt_ancrage_interpolated, dict_fixed_params, K, ind_masse, Ma, WITH_K_OBLIQUE=WITH_K_OBLIQUE, NO_COMPRESSION=True)
+                if F_athl is not None:
+                    F_point_after_step[ind_masse, :] += F_athl[0:3].T
+                    F_point_after_step[ind_masse + 1, :] += F_athl[3:6].T
+                    F_point_after_step[ind_masse - 1, :] += F_athl[6:9].T
+                    F_point_after_step[ind_masse + 15, :] += F_athl[9:12].T
+                    F_point_after_step[ind_masse - 15, :] += F_athl[12:15].T
+
+                for i in np.where(good_point_move == 0)[0]:
+                    vector_same_direction = F_point[i, 0] / F_point_after_step[i, 0] > 0 and F_point[i, 1] / F_point_after_step[i, 1] > 0 and F_point[i, 2] / F_point_after_step[i, 2] > 0
+                    angle_between_forces = np.arccos(np.dot(F_point[i, :], F_point_after_step[i, :]) / (
+                                np.linalg.norm(F_point[i, :]) * np.linalg.norm(F_point_after_step[i, :])))
+                    if angle_between_forces < np.pi/16 and vector_same_direction:  # or np.linalg.norm(F_point_after_step[i, :]) < 0.1:
+                        Pts_after[i, :] = Pts_after_step[i, :]
+                        good_point_move[i] = 1
+                    else:
+                        Pts_after_step[i, :] = Pts_before[i, :] + F_point[i, :] / (coefficient * (10 ** (num_iter+1)))
+
+                        # ax.plot(
+                        #     Pts_after_step[i, 0],
+                        #     Pts_after_step[i, 1],
+                        #     Pts_after_step[i, 2],
+                        #     ".",
+                        #     color=cmap(num_iter/10),
+                        # )
+
+                num_iter += 1
 
             for i in np.where(good_point_move == 0)[0]:
-                if (F_point_after_step[i, 0] == 0 or F_point[i, 0] / F_point_after_step[i, 0] > 0) and (F_point_after_step[i, 1] == 0 or F_point[i, 1] / F_point_after_step[i, 1] > 0) and (F_point_after_step[i, 2] == 0 or F_point[i, 2] / F_point_after_step[i, 2] > 0):
-                    Pts_after[i, :] = Pts_after_step[i, :]
-                    good_point_move[i] = 1
+                Pts_after[i, :] = Pts_before[i, :]
+
+            # if iteration < 5:
+            #     ax.plot(
+            #         Pts_after[:, 0],
+            #         Pts_after[:, 1],
+            #         Pts_after[:, 2],
+            #         ".r",
+            #         alpha=0.5,
+            #         markersize=6,
+            #     )
+            #
+            #     for i in range(m*n):
+            #         ax.plot(np.array([Pts_after[i, 0], Pts_after[i, 0] + F_point_after_step[i, 0]/coefficient]),
+            #                  np.array([Pts_after[i, 1], Pts_after[i, 1] + F_point_after_step[i, 1]/coefficient]),
+            #                  np.array([Pts_after[i, 2], Pts_after[i, 2] + F_point_after_step[i, 2]/coefficient]),
+            #                  "-k")
+            #         ax.plot(np.array([Pts_before[i, 0], Pts_before[i, 0] + F_point[i, 0]/coefficient]),
+            #                  np.array([Pts_before[i, 1], Pts_before[i, 1] + F_point[i, 1]/coefficient]),
+            #                  np.array([Pts_before[i, 2], Pts_before[i, 2] + F_point[i, 2]/coefficient]),
+            #                  "-b")
+            #         # ax.text(Pts_after[i, 0], Pts_after[i, 1], Pts_after[i, 2], str(i), color="r")
+            #     # ax.plot(Pts_after[100:, 0], Pts_after[100:, 1], Pts_after[100:, 2], "og")
+            #     # ax.plot(Pts_before[0:100, 0], Pts_before[67, 1], Pts_before[67, 2], "om")
+            #     plt.legend()
+            #     plt.show()
+
+            displacement += [np.linalg.norm(Pts_after - Pts_before, axis=1).sum()]
+            iteration += 1
+            Pts_before[:, :] = Pts_after[:, :]
+
+            if iteration == 15:
+                if np.mean(np.array(displacement[-5:])) < np.mean(np.array(displacement[1:6])):
+                    coefficient_ok = True
                 else:
-                    Pts_after_step[i, :] = Pts_before[i, :] + F_point[i, :] / (5000 * (10 ** (num_iter+1)))
+                    coefficient *= 10
+                    break
 
-                    # ax.plot(
-                    #     Pts_after_step[i, 0],
-                    #     Pts_after_step[i, 1],
-                    #     Pts_after_step[i, 2],
-                    #     ".",
-                    #     color=cmap(num_iter/10),
-                    # )
-
-            num_iter += 1
-
-        for i in np.where(good_point_move == 0)[0]:
-            # Pts_after[i, :] = Pts_after_step[i, :]
-            Pts_after[i, :] = Pts_before[i, :]
-
-        #     ax.plot(
-        #         Pts_after[i, 0],
-        #         Pts_after[i, 1],
-        #         Pts_after[i, 2],
-        #         "or",
-        #         mfc="none",
-        #         alpha=0.5,
-        #         markersize=6,
-        #     )
-        # plt.legend()
-        # plt.show()
-
-        displacement = np.linalg.norm(Pts_after - Pts_before, axis=1).sum()
-        iteration += 1
-        Pts_before[:, :] = Pts_after[:, :]
-
-        print(f"{iteration} : {displacement}")
+            print(f"{iteration} : {displacement[-1]}")
+        i_try += 1
 
     if PLOT_FLAG:
         fig = plt.figure()
