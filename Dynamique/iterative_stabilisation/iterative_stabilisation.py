@@ -106,7 +106,9 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
                     F_point_after_step[ind_masse - 15, :] += F_athl[12:15].T
 
                 for i in np.where(good_point_move == 0)[0]:
-                    vector_same_direction = F_point[i, 0] / F_point_after_step[i, 0] > 0 and F_point[i, 1] / F_point_after_step[i, 1] > 0 and F_point[i, 2] / F_point_after_step[i, 2] > 0
+                    vector_same_direction = ((F_point_after_step[i, 0] == 0 or F_point[i, 0] / F_point_after_step[i, 0] > 0)
+                                             and (F_point_after_step[i, 1] == 0 or F_point[i, 1] / F_point_after_step[i, 1] > 0)
+                                             and (F_point_after_step[i, 2] == 0 or F_point[i, 2] / F_point_after_step[i, 2] > 0))
                     angle_between_forces = np.arccos(np.dot(F_point[i, :], F_point_after_step[i, :]) / (
                                 np.linalg.norm(F_point[i, :]) * np.linalg.norm(F_point_after_step[i, :])))
                     if angle_between_forces < np.pi/16 and vector_same_direction:  # or np.linalg.norm(F_point_after_step[i, :]) < 0.1:
