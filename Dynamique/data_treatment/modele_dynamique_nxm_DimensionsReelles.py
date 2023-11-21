@@ -823,8 +823,10 @@ def Resultat_PF_collecte(participant, empty_trial_name, trial_name, jump_frame_i
         labels = c3d_experimental["parameters"]["POINT"]["LABELS"]["value"][0:ind_stop]
         named_positions = c3d_experimental["data"]["points"][0:3, 0:ind_stop, :]
 
+        if "t67" not in labels:
+            raise RuntimeError("deal with the case where the middle marker is not visible")
         ind_milieu = labels.index("t67")
-        moyenne_milieu = np.array([np.mean(named_positions[i, ind_milieu, :100]) for i in range(3)])
+        moyenne_milieu = np.mean(named_positions[:, ind_milieu, :100], axis=1)
 
         return labels, moyenne_milieu, named_positions
 
@@ -853,26 +855,25 @@ def Resultat_PF_collecte(participant, empty_trial_name, trial_name, jump_frame_i
 
     def find_lowest_marker(points, labels, jump_frame_index_interval):
         """
-
-        :param points: liste des 3 coordonnées des points labelisés pour sur l'intervalle de frame
-        :param labels: labels des points des essais a chaque frame
-        :param jump_frame_index_interval: intervalle de frame choisi
-        :return:
-        le min ???? a voir
+        Finds the label of the lowest marker on the jump frame interval.
+        points: list of the experimental marker position
+        labels: labels of the markers
+        jump_frame_index_interval: frame interval of the jump
         """
-        idx_min = []
-        position_min = []
-        labels_min = []
+        position_min = 1
+        labels_min = None
+        not_middle_labels_index = [i for i, str in enumerate(labels) if "M" not in str]
+        labels_without_middle = []
+        for label in labels:
+            if "M" not in label:
+                labels_without_middle += [label]
         for frame in range(0, jump_frame_index_interval[1] - jump_frame_index_interval[0]):
-            minimum_cal = np.nanargmin(points[2, :, frame])
-            position_min.append(np.nanmin(points[2, :, frame]))
-            idx_min.append(minimum_cal)
-            labels_min.append(labels[minimum_cal])
-        position_min_dynamique = np.min(position_min)
-        idx_min_dynamique = np.argmin(position_min)
-        label_min_dynamique = labels_min[idx_min_dynamique]
-
-        return idx_min_dynamique, label_min_dynamique
+            min_on_current_frame = np.nanmin(points[2, not_middle_labels_index, frame])
+            min_idx_on_curent_frame = np.nanargmin(points[2, not_middle_labels_index, frame])
+            if min_on_current_frame < position_min:
+                position_min = min_on_current_frame
+                labels_min = labels_without_middle[min_idx_on_curent_frame]
+        return position_min, labels_min
 
     c3d_vide = open_c3d(0, empty_trial_name)
     c3d_experimental = open_c3d(participant, trial_name)
