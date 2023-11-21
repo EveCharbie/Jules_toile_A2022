@@ -123,20 +123,20 @@ def main():
         plt.show()
 
     global_optim = global_optimisation(
-        Pts_collecte[0, :, :],
-        Pt_interpolated,
-        Pt_ancrage_interpolated,
+        Pts_collecte,
+        Pt_interpolated.reshape(1, 3, n*m),
+        Pt_ancrage_interpolated.reshape(1, 2*(m+n), 3),
         dict_fixed_params,
         labels,
-        ind_masse,
-        Masse_centre,
+        [ind_masse],
+        [Masse_centre],
         Pt_repos,
         Pt_ancrage_repos,
         None,
         WITH_K_OBLIQUE=False,
     )
     prob = pg.problem(global_optim)
-    w_opt, cost = solve(prob)
+    w_opt, cost = solve(prob, global_optim)
 
     Ma = np.array(w_opt[0:5])
     K = np.array(w_opt[5:])
