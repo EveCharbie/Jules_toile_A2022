@@ -235,12 +235,12 @@ def Optimisation(
         w0 += w0_Pt[i]
         w += [X]
 
-        # fonction contrainte :
+        # Constraints
         g += [Ma[0] + Ma[1] + Ma[2] + Ma[3] + Ma[4] - Masse_centre[i]]
         lbg += [0]
         ubg += [0]
 
-        # en statique on ne fait pas de boucle sur le temps :
+        # Objective
         obj += cost_function(
             X,
             K,

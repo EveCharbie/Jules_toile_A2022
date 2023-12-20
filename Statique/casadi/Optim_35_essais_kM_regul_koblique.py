@@ -118,7 +118,7 @@ def cost_function(X, K, Ma, Pt_collecte, Pt_ancrage, dict_fixed_params, ind_mass
             if not np.isnan(Pt_collecte[i_component, i_spring]):
                 Difference += 500 * (Pt[i_spring, i_component] - Pt_collecte[i_component, i_spring]) ** 2
 
-    Difference += F_total / 100000
+    Difference += cas.norm_fro(F_total) / 100000
 
     return Difference
 
