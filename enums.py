@@ -14,6 +14,7 @@ class InitialGuessType(Enum):
     SURFACE_INTERPOLATION = "surface_interpolation"
     RESTING_POSITION = "resting_position"
     GACO = "pygmo_gaco"
+    WARM_START = "warm_start"
     NONE = None
 
 

@@ -241,6 +241,8 @@ def solve(prob, global_optim):
 ##########################################################################################################################
 def main():
 
+    WITH_K_OBLIQUE = False
+
     # SELECTION OF THE RESULTS FROM THE DATA COLLECTION
     participant = 1
     # participant_1: 64.5 kg
@@ -277,8 +279,9 @@ def main():
                                                                       Pts_ancrage[idx, :, :],
                                                                       Pt_repos,
                                                                       Pt_ancrage_repos,
-                                                                      dict_fixed_params,
-                                                                      trial_name)
+                                                                      labels[idx],
+                                                                      ind_masse[idx],
+                                                                      WITH_K_OBLIQUE)
 
         global_optim = global_optimisation(
                     Pts_collecte[idx, :, :],

@@ -15,22 +15,22 @@ sys.path.append("../../")
 from enums import InitialGuessType
 
 sys.path.append("../../Statique/casadi/")
-from Optim_35_essais_kM_regul_koblique import Param_fixe, Calcul_Pt_F, list2tab, Spring_bouts, Spring_bouts_croix, tab2list
-from modele_dynamique_nxm_DimensionsReelles import (
+from utils_static import Param_fixe, Calcul_Pt_F, list2tab, Spring_bouts, Spring_bouts_croix, tab2list
+from utils_dynamic import (
     Resultat_PF_collecte,
     Point_ancrage,
     Point_toile_init,
     Points_ancrage_repos,
-    surface_interpolation_collecte,
     spring_bouts_collecte,
     static_forces_calc,
     static_force_in_each_point,
-    multiple_shooting_integration,
+    get_list_results_dynamic,
+    surface_interpolation_collecte,
 )
-from Optim_multi_essais_kM_regul_koblique import m_bounds
-from Verif_optim_position_k_fixe import Param_variable
-sys.path.append("../casadi/")
-from optim_dynamique_withoutC_casadi import get_list_results_dynamic, Pt_bounds, F_bounds
+
+sys.path.append("../data_treatment/")
+sys.path.append("../../Dynamique/data_treatment/")
+from modele_dynamique_nxm_DimensionsReelles import multiple_shooting_integration
 
 
 def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, Ma, F_athl, K, ind_masse, WITH_K_OBLIQUE, PLOT_FLAG=False):
@@ -211,7 +211,7 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
                      "-k")
         ax.legend()
         date_str = datetime.now().strftime("%b-%d-%Y-%H-%M-%S")
-        plt.savefig(f"../results/{date_str}_1_static.png")
+        plt.savefig(f"../results/{date_str}_static.png")
         # plt.show()
 
     return Pts_after, F_point_after_step
@@ -219,6 +219,9 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
 
 ##########################################################################################################################
 def main():
+
+    sys.path.append("../casadi/")
+    from optim_dynamique_withoutC_casadi import Pt_bounds, F_bounds
 
     # # SELECTION OF THE RESULTS FROM THE DATA COLLECTION
     # participant = 1
