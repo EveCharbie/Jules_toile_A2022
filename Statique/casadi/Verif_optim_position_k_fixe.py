@@ -1,5 +1,5 @@
 """
-Verification of the k values obtained in the training pool on the trial pool.
+Verification of the k values obtained in the training pool on the test pool.
 Here the only optimization variables are the positions of the markers, the k are constants.
 """
 
