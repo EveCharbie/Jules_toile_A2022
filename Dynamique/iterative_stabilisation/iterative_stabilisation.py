@@ -166,7 +166,7 @@ def position_the_points_based_on_the_force(Pt_interpolated, Pt_ancrage_interpola
                     coefficient *= 10
                     break
 
-            print(f"{iteration} : {displacement[-1]}")
+            # print(f"{iteration} : {displacement[-1]}")
         i_try += 1
 
     if PLOT_FLAG:

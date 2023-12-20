@@ -116,6 +116,8 @@ def main():
 
     Pts_interpolated = Pts_interpolated[1:, :, :]
     Pts_ancrage_interpolated = Pts_ancrage_interpolated[1:, :, :]
+    Pts_collecte = Pts_collecte[1:, :, :]
+    Pts_ancrage = Pts_ancrage[1:, :, :]
 
     global_optim = global_optimisation(
         Pts_collecte,
@@ -142,15 +144,19 @@ def main():
         K = np.array(w_opt[:8])
         offset = 8
 
-    Ma = []
-    for i in range(len(essais)):
-        Ma += np.array(w_opt[offset:offset+5])
+    Ma = w_opt[offset:offset+5]
+    offset += 5
+    for i in range(1, len(essais)):
+        Ma = np.hstack((Ma, w_opt[offset:offset+5]))
         offset += 5
 
     data = {"Ma": Ma,
             "K": K,
+            "w_opt": w_opt,
+            "cost": cost,
+            "essais": essais,
             }
-    with open(f"results/static_1essai.pkl", "wb") as f:
+    with open(f"results/static_multi_essai.pkl", "wb") as f:
         pickle.dump(data, f)
 
 
