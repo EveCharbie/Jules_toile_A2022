@@ -1102,7 +1102,7 @@ def Calcul_Pt_F(X, Pt_ancrage, dict_fixed_params, K, ind_masse):
 
     # Pt = tab2list(Pt)
 
-    # func = cas.Function('F', [X,K], [Pt,F_totale, K]).expand()
+    # func = cas.Function('F', [X,K], [Pt,F_totale, K])
 
     return F_totale, F_point
 
@@ -1184,7 +1184,7 @@ def cost_function(X, K, F_totale_collecte, Pt_collecte, Pt_ancrage, dict_fixed_p
     #         Energie += M[i].T * 9.81 * Pt[i, 2]
 
     output = Difference
-    obj = cas.Function("f", [X, K], [output]).expand()
+    obj = cas.Function("f", [X, K], [output])
 
     return obj
 

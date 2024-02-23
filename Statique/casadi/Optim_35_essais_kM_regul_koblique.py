@@ -93,9 +93,9 @@ Nb_ressorts_vert = m * (n - 1)  # nombre de ressorts verticaux dans la toile (pa
 #     if type(K) == cas.MX:
 #         regul_k = K[8] ** 2 + K[9] ** 2 + K[10] ** 2 + K[11] ** 2
 #         output = (1e4) * Difference + (1e-6) * regul_k
-#         obj = cas.Function("f", [X, K, Ma], [output]).expand()
+#         obj = cas.Function("f", [X, K, Ma], [output])
 #     else:
-#         obj = cas.Function("f", [X, Ma], [1e-6 * Difference]).expand()
+#         obj = cas.Function("f", [X, Ma], [1e-6 * Difference])
 #
 #     return obj
 

@@ -1118,7 +1118,7 @@ def cost_function(X, K, F_totale_collecte, Pt_collecte, Pt_ancrage, dict_fixed_p
     regul_k = K[8] ** 2 + K[9] ** 2 + K[10] ** 2 + K[11] ** 2
 
     output = 1000 * Difference + (1e-7) * regul_k
-    obj = cas.Function("f", [X, K], [output]).expand()
+    obj = cas.Function("f", [X, K], [output])
 
     return obj
 

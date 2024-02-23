@@ -417,7 +417,7 @@ def Optimisation():  # main
             Difference += 1000 * (Force_point[0, j] - Force_plateforme[0, j]) ** 2
 
         output = Difference
-        obj = cas.Function("f", [X, Xdot, C, F], [output]).expand()
+        obj = cas.Function("f", [X, Xdot, C, F], [output])
 
         return obj
 

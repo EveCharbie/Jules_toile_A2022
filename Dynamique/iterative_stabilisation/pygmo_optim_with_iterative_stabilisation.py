@@ -17,12 +17,15 @@ from enums import InitialGuessType
 sys.path.append("../Statique/casadi/")
 from Optim_35_essais_kM_regul_koblique import Param_fixe, list2tab, Spring_bouts, Spring_bouts_croix, tab2list
 from modele_dynamique_nxm_DimensionsReelles import (
-    Points_ancrage_repos,
     multiple_shooting_integration,
 )
 from Optim_multi_essais_kM_regul_koblique import m_bounds, k_bounds
-from optim_dynamique_withoutC_casadi import get_list_results_dynamic, Pt_bounds, F_bounds
+
+from optim_dynamique_withoutC_casadi import Pt_bounds, F_bounds
 from iterative_stabilisation import position_the_points_based_on_the_force
+
+sys.path.append("../")
+from utils_dynamic import Points_ancrage_repos, get_list_results_dynamic
 
 def cost_function(Ma, F_athl, K, Pt_collecte, Pt_interpolated, Pt_ancrage_interpolated, dict_fixed_params, labels, ind_masse, WITH_K_OBLIQUE):
 

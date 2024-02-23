@@ -29,29 +29,24 @@ from enums import InitialGuessType
 
 sys.path.append("../Statique/")
 from Optim_35_essais_kM_regul_koblique import Param_fixe, Calcul_Pt_F, list2tab, Spring_bouts, Spring_bouts_croix
-from modele_dynamique_nxm_DimensionsReelles import (
-    Resultat_PF_collecte,
-    Point_ancrage,
-    Point_toile_init,
-    Points_ancrage_repos,
-    surface_interpolation_collecte,
-    spring_bouts_collecte,
-    static_forces_calc,
-    static_force_in_each_point,
-    multiple_shooting_integration,
-)
+from modele_dynamique_nxm_DimensionsReelles import multiple_shooting_integration
 from Optim_multi_essais_kM_regul_koblique import m_bounds
-from Verif_optim_position_k_fixe import Param_variable
+from utils_static import Param_variable
 
-def get_list_results_dynamic(participant, empty_trial_name, trial_name, jump_frame_index_interval):
-    F_totale_collecte, Pt_collecte_tab, labels, ind_masse = Resultat_PF_collecte(
-        participant, empty_trial_name, trial_name, jump_frame_index_interval
-    )
-    Pt_ancrage, labels_ancrage = Point_ancrage(Pt_collecte_tab, labels)
-    Pt_collecte, label_toile = Point_toile_init(Pt_collecte_tab, labels)
-
-    return F_totale_collecte, Pt_collecte, labels, ind_masse, Pt_ancrage
-
+sys.path.append("../")
+from utils_dynamic import (get_list_results_dynamic,
+                           Points_ancrage_repos,
+                           linear_interpolation_collecte,
+                           surface_interpolation_collecte,
+                           static_force_in_each_point,
+                           Resultat_PF_collecte,
+                           Point_ancrage,
+                           Point_toile_init,
+                           Points_ancrage_repos,
+                           surface_interpolation_collecte,
+                           spring_bouts_collecte,
+                           static_forces_calc,
+                           static_force_in_each_point)
 
 def F_bounds(initial_guess, trial_name):
     if initial_guess == InitialGuessType.GACO:
@@ -143,7 +138,7 @@ def cost_function(X, K, Ma, F_athl, Pt_collecte, Pt_ancrage, Pt_interpolated, di
     for ind in range(spring_elongation_croix.shape[0]):
         Difference += 0.01 * spring_elongation_croix[ind] ** 2
 
-    obj = cas.Function("f", [X, Ma, F_athl], [Difference]).expand()
+    obj = cas.Function("f", [X, Ma, F_athl], [Difference])
 
     return obj
 
